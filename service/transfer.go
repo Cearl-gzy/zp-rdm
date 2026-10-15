@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"zp-rdm/internal/model"
 	"zp-rdm/internal/redisx"
@@ -171,7 +170,7 @@ func (s *TransferService) ExportDatabase(connID string, db int, pattern, path st
 				}
 			}
 			total += int64(len(dumped))
-			wailsRuntime.EventsEmit(s.ctx, EventExportProgress, total)
+			emit(s.ctx, EventExportProgress, total)
 		}
 		if cursor == 0 {
 			break

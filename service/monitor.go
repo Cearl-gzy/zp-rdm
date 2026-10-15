@@ -7,8 +7,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // MONITOR 命令流（go-redis 无公开流式 API，用裸连接 + 手写 RESP 实现）
@@ -127,7 +125,7 @@ func (s *ServerService) StartMonitor(connID string, db int) error {
 			if err != nil {
 				return // 连接被 StopMonitor 关闭或服务端断开
 			}
-			wailsRuntime.EventsEmit(s.ctx, eventName, line)
+			emit(s.ctx, eventName, line)
 		}
 	}()
 	return nil

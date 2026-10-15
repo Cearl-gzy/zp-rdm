@@ -74,6 +74,7 @@ func (a *App) startup(ctx context.Context) {
 			wailsRuntime.WindowMaximise(ctx)
 		}
 	}
+	service.SetEventEmitter(wailsRuntime.EventsEmit)
 	a.Connection.Startup(ctx)
 	a.Key.Startup(ctx)
 	a.Value.Startup(ctx)

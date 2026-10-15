@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/redis/go-redis/v9"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"zp-rdm/internal/model"
 	"zp-rdm/internal/redisx"
@@ -230,7 +229,7 @@ func (s *ServerService) Subscribe(connID string, db int, channel string, pattern
 			if msg.Pattern != "" {
 				kind = "pmessage"
 			}
-			wailsRuntime.EventsEmit(s.ctx, eventName, model.PubSubMessage{
+			emit(s.ctx, eventName, model.PubSubMessage{
 				Channel: msg.Channel,
 				Pattern: msg.Pattern,
 				Payload: msg.Payload,
