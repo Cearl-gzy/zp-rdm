@@ -18,6 +18,22 @@ type WindowState struct {
 	Maximised bool `json:"maximised"`
 }
 
+// ConnWorkspace 单个连接的工作区状态（数据视图）
+type ConnWorkspace struct {
+	View        string `json:"view"`        // data | analysis | info | cli | slowlog | pubsub
+	SelectedKey string `json:"selectedKey"` // 数据视图中选中的键
+	Pattern     string `json:"pattern"`     // 键匹配模式
+	ViewMode    string `json:"viewMode"`    // tree | list
+	Delimiter   string `json:"delimiter"`   // 键树分隔符
+}
+
+// Workspace 工作区会话：打开的连接标签 + 各连接的视图状态
+type Workspace struct {
+	Open   []string                  `json:"open"`   // 打开的连接 id（按标签顺序）
+	Active string                    `json:"active"` // 当前激活的连接 id
+	Conns  map[string]*ConnWorkspace `json:"conns"`
+}
+
 // Settings 应用设置
 type Settings struct {
 	Window       WindowState    `json:"window"`
@@ -25,6 +41,7 @@ type Settings struct {
 	Theme        string         `json:"theme"` // dark | light | ""（跟随默认深色）
 	LastDb       map[string]int `json:"lastDb"`
 	CliHistory   []string       `json:"cliHistory"` // CLI 命令历史（全局，上限 200 条）
+	Workspace    Workspace      `json:"workspace"`
 }
 
 // Manager 设置读写（带锁）
@@ -41,6 +58,7 @@ func defaults() Settings {
 		Theme:        "",
 		LastDb:       map[string]int{},
 		CliHistory:   []string{},
+		Workspace:    Workspace{Open: []string{}, Conns: map[string]*ConnWorkspace{}},
 	}
 }
 
@@ -69,6 +87,12 @@ func NewAt(path string) (*Manager, error) {
 	if m.data.CliHistory == nil {
 		m.data.CliHistory = []string{}
 	}
+	if m.data.Workspace.Open == nil {
+		m.data.Workspace.Open = []string{}
+	}
+	if m.data.Workspace.Conns == nil {
+		m.data.Workspace.Conns = map[string]*ConnWorkspace{}
+	}
 	if m.data.SidebarWidth < 160 || m.data.SidebarWidth > 480 {
 		m.data.SidebarWidth = 236
 	}
@@ -86,6 +110,16 @@ func (m *Manager) Get() Settings {
 	}
 	s.LastDb = lastDb
 	s.CliHistory = append([]string(nil), m.data.CliHistory...)
+	ws := Workspace{
+		Open:   append([]string{}, m.data.Workspace.Open...),
+		Active: m.data.Workspace.Active,
+		Conns:  make(map[string]*ConnWorkspace, len(m.data.Workspace.Conns)),
+	}
+	for k, v := range m.data.Workspace.Conns {
+		c := *v
+		ws.Conns[k] = &c
+	}
+	s.Workspace = ws
 	return s
 }
 
@@ -114,6 +148,33 @@ func (m *Manager) SaveCliHistory(history []string) error {
 		history = history[len(history)-maxCliHistory:]
 	}
 	m.data.CliHistory = append([]string(nil), history...)
+	return m.saveLocked()
+}
+
+// maxWorkspaceConns 工作区单连接数上限（防配置膨胀）
+const maxWorkspaceConns = 64
+
+// SaveWorkspace 保存工作区会话（打开的标签 + 各连接视图状态）
+func (m *Manager) SaveWorkspace(w Workspace) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if w.Open == nil {
+		w.Open = []string{}
+	}
+	if w.Conns == nil {
+		w.Conns = map[string]*ConnWorkspace{}
+	}
+	// 防御性收敛：超出上限时只保留最近使用的连接状态
+	if len(w.Conns) > maxWorkspaceConns {
+		keep := map[string]*ConnWorkspace{}
+		for _, id := range w.Open {
+			if c, ok := w.Conns[id]; ok {
+				keep[id] = c
+			}
+		}
+		w.Conns = keep
+	}
+	m.data.Workspace = w
 	return m.saveLocked()
 }
 

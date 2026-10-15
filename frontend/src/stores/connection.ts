@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import {
   ListConnections, SaveConnection, DeleteConnection, DuplicateConnection,
   OpenConnection, CloseConnection, TestConnection, OpenStates,
@@ -102,6 +103,30 @@ export const useConnectionStore = defineStore('connection', () => {
     useAppStore().setLastDb(id, db)
   }
 
+  // ---------- 工作区会话 ----------
+  // 标签增删 / 激活切换 → 持久化到 settings
+  watch(() => openTabs.value.map(t => t.id).join(',') + '|' + activeTab.value, () => {
+    useAppStore().setOpenTabs(openTabs.value.map(t => t.id), activeTab.value)
+  })
+
+  // 启动时恢复上次打开的连接标签（逐个打开，失败的跳过并提示）
+  async function restoreWorkspace() {
+    const w = useAppStore().workspace
+    if (!w.open.length) return
+    const failed: string[] = []
+    for (const id of w.open) {
+      const prof = profiles.value.find(p => p.id === id)
+      if (!prof || openIds.value.has(id)) continue
+      try {
+        await open(id)
+      } catch {
+        failed.push(prof.name || id)
+      }
+    }
+    if (w.active && openIds.value.has(w.active)) activeTab.value = w.active
+    if (failed.length) message.warning(`连接失败，已跳过：${failed.join('、')}`)
+  }
+
   async function exportTo(path: string) { await ExportConnections(path) }
   async function importFrom(path: string) {
     const n = await ImportConnections(path)
@@ -112,7 +137,7 @@ export const useConnectionStore = defineStore('connection', () => {
   return {
     profiles, openTabs, activeTab, opening, currentDb,
     groups, openIds,
-    loadProfiles, save, remove, duplicate, test, open, close, setDb,
+    loadProfiles, save, remove, duplicate, test, open, close, setDb, restoreWorkspace,
     exportTo, importFrom,
   }
 })

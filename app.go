@@ -21,7 +21,7 @@ import (
 const AppVersion = "1.1.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
-const updateManifestURL = ""
+const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
 
 // App struct
 type App struct {
@@ -113,6 +113,11 @@ func (a *App) GetSettings() settings.Settings {
 // SaveCliHistory 保存 CLI 命令历史
 func (a *App) SaveCliHistory(history []string) error {
 	return a.Settings.SaveCliHistory(history)
+}
+
+// SaveWorkspace 保存工作区会话（打开的标签 + 各连接视图状态）
+func (a *App) SaveWorkspace(w settings.Workspace) error {
+	return a.Settings.SaveWorkspace(w)
 }
 
 // SaveFrontendState 保存前端状态（主题/侧栏宽度/每连接 db）

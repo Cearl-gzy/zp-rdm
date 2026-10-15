@@ -1,6 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
-import { GetSettings, SaveFrontendState, SaveCliHistory, Version } from '../../wailsjs/go/main/App'
+import { GetSettings, SaveFrontendState, SaveCliHistory, SaveWorkspace, Version } from '../../wailsjs/go/main/App'
+
+export interface ConnWorkspace {
+  view?: string
+  selectedKey?: string
+  pattern?: string
+  viewMode?: string
+  delimiter?: string
+}
+
+export interface Workspace {
+  open: string[]
+  active: string
+  conns: Record<string, ConnWorkspace>
+}
+
+const emptyWorkspace = (): Workspace => ({ open: [], active: '', conns: {} })
 
 export const useAppStore = defineStore('app', () => {
   // localStorage 作为首屏防闪烁的即时提示，后端设置加载后以后端为准
@@ -46,6 +62,14 @@ export const useAppStore = defineStore('app', () => {
       sidebarWidth.value = s.sidebarWidth || 236
       lastDb.value = (s.lastDb as Record<string, number>) ?? {}
       cliHistory.value = ((s.cliHistory as string[]) ?? []).slice(-200)
+      const w = s.workspace
+      if (w) {
+        workspace.value = {
+          open: w.open ?? [],
+          active: w.active ?? '',
+          conns: (w.conns ?? {}) as Record<string, ConnWorkspace>,
+        }
+      }
     } catch { /* 设置读取失败时使用默认值 */ }
     settingsReady.value = true
     try { version.value = await Version() } catch { /* 忽略 */ }
@@ -65,6 +89,26 @@ export const useAppStore = defineStore('app', () => {
     }, 800)
   }
 
+  // 工作区会话（打开的连接标签 + 各连接视图状态，防抖落盘）
+  const workspace = ref<Workspace>(emptyWorkspace())
+  let wTimer: ReturnType<typeof setTimeout> | null = null
+  function persistWorkspace() {
+    if (!settingsReady.value) return
+    if (wTimer) clearTimeout(wTimer)
+    wTimer = setTimeout(() => {
+      SaveWorkspace(JSON.parse(JSON.stringify(workspace.value))).catch(() => {})
+    }, 600)
+  }
+  function setOpenTabs(ids: string[], active: string) {
+    workspace.value.open = ids
+    workspace.value.active = active
+    persistWorkspace()
+  }
+  function patchConnWorkspace(connId: string, patch: Partial<ConnWorkspace>) {
+    workspace.value.conns[connId] = { ...workspace.value.conns[connId], ...patch }
+    persistWorkspace()
+  }
+
   // 命令面板（Ctrl+K）
   const paletteOpen = ref(false)
   function togglePalette(v?: boolean) {
@@ -78,5 +122,6 @@ export const useAppStore = defineStore('app', () => {
     version, initSettings,
     paletteOpen, togglePalette,
     cliHistory, pushCliHistory,
+    workspace, setOpenTabs, patchConnWorkspace,
   }
 })

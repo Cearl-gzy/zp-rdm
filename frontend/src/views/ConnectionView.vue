@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useConnectionStore } from '../stores/connection'
+import { useAppStore } from '../stores/app'
 import type { ConnState } from '../types'
 import KeyBrowser from './KeyBrowser.vue'
 import KeyAnalysis from './KeyAnalysis.vue'
@@ -16,7 +17,12 @@ import {
 const props = defineProps<{ connId: string; state: ConnState }>()
 
 const conn = useConnectionStore()
-const activeView = ref('data')
+const app = useAppStore()
+
+const views = ['data', 'analysis', 'info', 'cli', 'slowlog', 'pubsub']
+const savedView = app.workspace.conns[props.connId]?.view ?? 'data'
+const activeView = ref(views.includes(savedView) ? savedView : 'data')
+watch(activeView, v => app.patchConnWorkspace(props.connId, { view: v }))
 
 const db = computed({
   get: () => conn.currentDb[props.connId] ?? 0,

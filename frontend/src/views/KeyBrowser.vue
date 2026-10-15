@@ -12,6 +12,7 @@ import { ExportKeys, ExportDatabase, ImportKeys } from '../../wailsjs/go/service
 import { PickSaveFile, PickOpenFile } from '../../wailsjs/go/main/App'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useConnectionStore } from '../stores/connection'
+import { useAppStore } from '../stores/app'
 import { onAppEvent, AppEvents } from '../utils/events'
 import type { KeyInfo, ScanResult } from '../types'
 import { buildKeyTree, type KeyNode } from '../utils/keyTree'
@@ -20,18 +21,30 @@ import ValuePanel from './ValuePanel.vue'
 
 const props = defineProps<{ connId: string; db: number }>()
 const conn = useConnectionStore()
+const app = useAppStore()
+
+// 从工作区会话恢复浏览状态
+const savedWs = app.workspace.conns[props.connId] ?? {}
 
 const keys = ref<KeyInfo[]>([])
 const cursor = ref(0)
 const total = ref(0)
 const loading = ref(false)
-const pattern = ref('')
+const pattern = ref(savedWs.pattern ?? '')
 const typeFilter = ref('')
-const viewMode = ref<'tree' | 'list'>('tree')
-const delimiter = ref(':')
-const selectedKey = ref('')
+const viewMode = ref<'tree' | 'list'>(savedWs.viewMode === 'list' ? 'list' : 'tree')
+const delimiter = ref(savedWs.delimiter || ':')
+const selectedKey = ref(savedWs.selectedKey ?? '')
 const checkedKeys = ref<string[]>([])
 const expandedKeys = ref<string[]>([])
+
+// 浏览状态变化 → 防抖持久化到工作区
+watch([pattern, viewMode, delimiter], () => {
+  app.patchConnWorkspace(props.connId, {
+    pattern: pattern.value, viewMode: viewMode.value, delimiter: delimiter.value,
+  })
+})
+watch(selectedKey, v => app.patchConnWorkspace(props.connId, { selectedKey: v }))
 
 const PAGE_SIZE = 500
 
@@ -65,13 +78,18 @@ async function scan(reset = false) {
   }
 }
 
-function refresh() {
-  selectedKey.value = ''
+function refresh(keepSelection = false) {
+  if (!keepSelection) selectedKey.value = ''
   checkedKeys.value = []
   scan(true)
 }
 
-watch(() => [props.db, props.connId], refresh, { immediate: true })
+// 首次加载保留工作区恢复的选中键，之后切换 db/连接才清空
+let firstLoad = true
+watch(() => [props.db, props.connId], () => {
+  refresh(firstLoad)
+  firstLoad = false
+}, { immediate: true })
 
 // F5 / Ctrl+R 刷新：仅当前激活标签页的浏览器响应
 let offRefresh: (() => void) | null = null

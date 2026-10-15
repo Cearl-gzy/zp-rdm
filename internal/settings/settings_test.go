@@ -181,3 +181,48 @@ func TestCliHistory(t *testing.T) {
 		t.Fatal("Get leaked mutable slice")
 	}
 }
+
+func TestWorkspace(t *testing.T) {
+	m, path := newTemp(t)
+	// 默认值
+	w := m.Get().Workspace
+	if w.Open == nil || w.Conns == nil || w.Active != "" {
+		t.Fatalf("default workspace malformed: %+v", w)
+	}
+
+	err := m.SaveWorkspace(Workspace{
+		Open:   []string{"conn-a", "conn-b"},
+		Active: "conn-b",
+		Conns: map[string]*ConnWorkspace{
+			"conn-a": {View: "data", SelectedKey: "user:1", Pattern: "user:*", ViewMode: "tree", Delimiter: ":"},
+			"conn-b": {View: "cli"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 落盘往返
+	m2, err := NewAt(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := m2.Get().Workspace
+	if got.Active != "conn-b" || len(got.Open) != 2 || got.Open[0] != "conn-a" {
+		t.Fatalf("workspace not persisted: %+v", got)
+	}
+	ca := got.Conns["conn-a"]
+	if ca == nil || ca.SelectedKey != "user:1" || ca.Pattern != "user:*" || ca.Delimiter != ":" {
+		t.Fatalf("conn-a workspace lost: %+v", ca)
+	}
+
+	// Get 深拷贝：外部修改不影响内部
+	ca.SelectedKey = "MUTATED"
+	got.Open[0] = "MUTATED"
+	if m2.Get().Workspace.Conns["conn-a"].SelectedKey != "user:1" {
+		t.Fatal("Get leaked mutable conn workspace")
+	}
+	if m2.Get().Workspace.Open[0] != "conn-a" {
+		t.Fatal("Get leaked mutable open slice")
+	}
+}

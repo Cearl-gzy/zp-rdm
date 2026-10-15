@@ -17,7 +17,8 @@ const conn = useConnectionStore()
 
 onMounted(async () => {
   await app.initSettings()
-  conn.loadProfiles()
+  await conn.loadProfiles()
+  conn.restoreWorkspace()
 })
 
 // ---------- 全局快捷键 ----------
