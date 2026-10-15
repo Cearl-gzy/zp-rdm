@@ -24,7 +24,8 @@ jobs:
       - name: Run tests
         env:
           ZP_RDM_TEST_REDIS_ADDR: localhost:6379
-        run: go test ./...
+        # 不测根包：main.go embed frontend/dist（CI 上未构建，编译必失败）
+        run: go test ./internal/... ./service/...
 
   build:
     needs: test
