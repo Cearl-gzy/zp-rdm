@@ -4,6 +4,10 @@ on:
   push:
     tags: ['v*']
 
+# 创建 Release 需要写权限（新仓库默认只读，403 Resource not accessible）
+permissions:
+  contents: write
+
 jobs:
   # 单元测试 + 真实 Redis 集成测试（miniredis 不支持的 DUMP/RESTORE 在此覆盖）
   test:
@@ -60,8 +64,20 @@ jobs:
       - name: Install NSIS
         run: choco install nsis -y --no-progress
 
+      # choco 装的 makensis 在 Program Files (x86)\NSIS，不在 runner 会话 PATH 中
+      - name: Add makensis to PATH
+        run: echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Build installer
         run: wails build -nsis -clean
+
+      # wails 找不到 makensis 时只是 warning 不报错，显式校验产物
+      - name: Verify installer exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path build/bin/zp-rdm-amd64-installer.exe)) {
+            throw "NSIS 安装包未生成，请检查 makensis 是否在 PATH"
+          }
 
       # 更新清单：应用内 CheckUpdate 轮询固定地址 releases/latest/download/latest.json
       - name: Generate update manifest
