@@ -7,14 +7,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 )
 
-func newValueService(t *testing.T) (*ValueService, *miniredis.Miniredis, string) {
-	m, mr, connID := newTestManager(t)
+func newValueService(t *testing.T) (*ValueService, *redis.Client, string) {
+	m, seed, connID := newTestManager(t)
 	s := NewValueService(m)
 	s.Startup(context.Background())
-	return s, mr, connID
+	return s, seed, connID
 }
 
 func TestIsBinaryString(t *testing.T) {
@@ -40,10 +40,8 @@ func TestIsBinaryString(t *testing.T) {
 }
 
 func TestGetValueString(t *testing.T) {
-	s, mr, connID := newValueService(t)
-	if err := mr.Set("k1", "hello"); err != nil {
-		t.Fatal(err)
-	}
+	s, c, connID := newValueService(t)
+	mustSet(t, c, "k1", "hello")
 	d, err := s.GetValue(connID, 0, "k1")
 	if err != nil {
 		t.Fatal(err)
@@ -63,10 +61,8 @@ func TestGetValueString(t *testing.T) {
 }
 
 func TestGetValueBinaryFlag(t *testing.T) {
-	s, mr, connID := newValueService(t)
-	if err := mr.Set("bin", "a\x00b\xffc"); err != nil {
-		t.Fatal(err)
-	}
+	s, c, connID := newValueService(t)
+	mustSet(t, c, "bin", "a\x00b\xffc")
 	d, err := s.GetValue(connID, 0, "bin")
 	if err != nil {
 		t.Fatal(err)
@@ -129,40 +125,36 @@ func TestSetStringHexInvalid(t *testing.T) {
 }
 
 func TestSetStringKeepTTL(t *testing.T) {
-	s, mr, connID := newValueService(t)
-	if err := mr.Set("k", "v1"); err != nil {
-		t.Fatal(err)
-	}
-	mr.SetTTL("k", 2*time.Hour)
+	s, c, connID := newValueService(t)
+	mustSet(t, c, "k", "v1")
+	mustExpire(t, c, "k", 2*time.Hour)
 
 	// ttl<0 → 保持原 TTL
 	if err := s.SetString(connID, 0, "k", "v2", -1); err != nil {
 		t.Fatal(err)
 	}
-	if v, _ := mr.Get("k"); v != "v2" {
+	if v := mustGet(t, c, "k"); v != "v2" {
 		t.Fatalf("k = %q, want v2", v)
 	}
-	if ttl := mr.TTL("k"); ttl < 110*time.Minute {
+	if ttl := mustTTL(t, c, "k"); ttl < 110*time.Minute {
 		t.Fatalf("TTL lost after KeepTTL set: %v", ttl)
 	}
 }
 
 func TestSetStringWithTTL(t *testing.T) {
-	s, mr, connID := newValueService(t)
+	s, c, connID := newValueService(t)
 	if err := s.SetString(connID, 0, "k", "v", 60); err != nil {
 		t.Fatal(err)
 	}
-	if ttl := mr.TTL("k"); ttl < 50*time.Second || ttl > 60*time.Second {
+	if ttl := mustTTL(t, c, "k"); ttl < 50*time.Second || ttl > 60*time.Second {
 		t.Fatalf("ttl = %v, want ~60s", ttl)
 	}
 }
 
 func TestGetFullString(t *testing.T) {
-	s, mr, connID := newValueService(t)
+	s, c, connID := newValueService(t)
 	big := strings.Repeat("x", 2<<20) // 2MB，超过预览 1MB 截断
-	if err := mr.Set("big", big); err != nil {
-		t.Fatal(err)
-	}
+	mustSet(t, c, "big", big)
 
 	// 预览应截断
 	d, err := s.GetValue(connID, 0, "big")
@@ -205,10 +197,8 @@ func TestTTLSentinels(t *testing.T) {
 		t.Fatalf("ttlMillis(1500ms) = %d, want 1500", got)
 	}
 	// 永久键 TTL 端到端：GetValue 应报告 -1 而非 0
-	s, mr, connID := newValueService(t)
-	if err := mr.Set("perm", "v"); err != nil {
-		t.Fatal(err)
-	}
+	s, c, connID := newValueService(t)
+	mustSet(t, c, "perm", "v")
 	d, err := s.GetValue(connID, 0, "perm")
 	if err != nil {
 		t.Fatal(err)

@@ -8,31 +8,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 
 	"zp-rdm/internal/model"
 )
 
-func seedKeys(t *testing.T, mr *miniredis.Miniredis) {
+// seedKeys 通过种子客户端写入测试数据（miniredis 与真实 Redis 一致）
+func seedKeys(t *testing.T, c *redis.Client) {
 	t.Helper()
-	if err := mr.Set("user:1", "alice"); err != nil {
+	mustSet(t, c, "user:1", "alice")
+	mustSet(t, c, "user:2", "bob")
+	if err := c.HSet(tctx, "hash:1", "f1", "v1", "f2", "v2").Err(); err != nil {
 		t.Fatal(err)
 	}
-	if err := mr.Set("user:2", "bob"); err != nil {
-		t.Fatal(err)
-	}
-	mr.HSet("hash:1", "f1", "v1", "f2", "v2")
-	mr.SetTTL("user:1", time.Hour)
+	mustExpire(t, c, "user:1", time.Hour)
 }
 
 func TestExportImportRoundTrip(t *testing.T) {
-	src, mrSrc, srcID := newTransferService(t)
+	src, cSrc, srcID := newTransferService(t)
 	requireDump(t, src, srcID)
-	seedKeys(t, mrSrc)
-
-	// 目标实例
-	dst, mrDst, dstID := newTransferService(t)
+	// 目标实例（真实 Redis 为共享实例，fixture 创建时会清库，须在种数前建好）
+	dst, cDst, dstID := newTransferService(t)
 	_ = dstID
+	seedKeys(t, cSrc)
 
 	path := filepath.Join(t.TempDir(), "export.json")
 	n, err := src.ExportKeys(srcID, 0, []string{"user:1", "user:2", "hash:1"}, "json", path)
@@ -52,23 +50,22 @@ func TestExportImportRoundTrip(t *testing.T) {
 	}
 
 	// 值一致
-	if v, _ := mrDst.Get("user:1"); v != "alice" {
+	if v := mustGet(t, cDst, "user:1"); v != "alice" {
 		t.Fatalf("user:1 = %q, want alice", v)
 	}
-	if v := mrDst.HGet("hash:1", "f2"); v != "v2" {
-		t.Fatalf("hash:1.f2 = %q, want v2", v)
+	if v, err := cDst.HGet(tctx, "hash:1", "f2").Result(); err != nil || v != "v2" {
+		t.Fatalf("hash:1.f2 = %q, want v2 (err=%v)", v, err)
 	}
 	// TTL 保留（允许少量误差）
-	ttl := mrDst.TTL("user:1")
-	if ttl < 55*time.Minute || ttl > time.Hour {
+	if ttl := mustTTL(t, cDst, "user:1"); ttl < 55*time.Minute || ttl > time.Hour {
 		t.Fatalf("user:1 ttl = %v, want ~1h", ttl)
 	}
 }
 
 func TestExportKeysJSONStructure(t *testing.T) {
-	s, mr, connID := newTransferService(t)
+	s, c, connID := newTransferService(t)
 	requireDump(t, s, connID)
-	seedKeys(t, mr)
+	seedKeys(t, c)
 
 	path := filepath.Join(t.TempDir(), "out.json")
 	if _, err := s.ExportKeys(connID, 0, []string{"user:1"}, "json", path); err != nil {
@@ -91,9 +88,9 @@ func TestExportKeysJSONStructure(t *testing.T) {
 }
 
 func TestExportKeysCSV(t *testing.T) {
-	s, mr, connID := newTransferService(t)
+	s, c, connID := newTransferService(t)
 	requireDump(t, s, connID)
-	seedKeys(t, mr)
+	seedKeys(t, c)
 
 	path := filepath.Join(t.TempDir(), "out.csv")
 	n, err := s.ExportKeys(connID, 0, []string{"user:1", "hash:1"}, "csv", path)
@@ -117,9 +114,11 @@ func TestExportKeysCSV(t *testing.T) {
 }
 
 func TestExportDatabaseAndImportJSONL(t *testing.T) {
-	src, mrSrc, srcID := newTransferService(t)
+	src, cSrc, srcID := newTransferService(t)
 	requireDump(t, src, srcID)
-	seedKeys(t, mrSrc)
+	// 目标实例（真实 Redis 为共享实例，fixture 创建时会清库，须在种数前建好）
+	dst, cDst, dstID := newTransferService(t)
+	seedKeys(t, cSrc)
 
 	path := filepath.Join(t.TempDir(), "db.jsonl")
 	total, err := src.ExportDatabase(srcID, 0, "*", path)
@@ -137,7 +136,6 @@ func TestExportDatabaseAndImportJSONL(t *testing.T) {
 		t.Fatalf("jsonl lines = %d, want 3", len(lines))
 	}
 
-	dst, mrDst, dstID := newTransferService(t)
 	imported, err := dst.ImportKeys(dstID, 0, path)
 	if err != nil {
 		t.Fatalf("ImportKeys(jsonl): %v", err)
@@ -145,15 +143,15 @@ func TestExportDatabaseAndImportJSONL(t *testing.T) {
 	if imported != 3 {
 		t.Fatalf("imported %d, want 3", imported)
 	}
-	if v, _ := mrDst.Get("user:2"); v != "bob" {
+	if v := mustGet(t, cDst, "user:2"); v != "bob" {
 		t.Fatalf("user:2 = %q", v)
 	}
 }
 
 func TestExportDatabasePattern(t *testing.T) {
-	src, mrSrc, srcID := newTransferService(t)
+	src, cSrc, srcID := newTransferService(t)
 	requireDump(t, src, srcID)
-	seedKeys(t, mrSrc)
+	seedKeys(t, cSrc)
 
 	path := filepath.Join(t.TempDir(), "users.jsonl")
 	total, err := src.ExportDatabase(srcID, 0, "user:*", path)
@@ -166,46 +164,40 @@ func TestExportDatabasePattern(t *testing.T) {
 }
 
 func TestImportOverwrite(t *testing.T) {
-	src, mrSrc, srcID := newTransferService(t)
+	src, c, srcID := newTransferService(t)
 	requireDump(t, src, srcID)
-	if err := mrSrc.Set("k", "v1"); err != nil {
-		t.Fatal(err)
-	}
+	mustSet(t, c, "k", "v1")
 	path := filepath.Join(t.TempDir(), "k.json")
 	if _, err := src.ExportKeys(srcID, 0, []string{"k"}, "json", path); err != nil {
 		t.Fatal(err)
 	}
 
 	// 改值后导入应覆盖（RESTORE REPLACE）
-	if err := mrSrc.Set("k", "v2"); err != nil {
-		t.Fatal(err)
-	}
+	mustSet(t, c, "k", "v2")
 	if _, err := src.ImportKeys(srcID, 0, path); err != nil {
 		t.Fatalf("import overwrite: %v", err)
 	}
-	if v, _ := mrSrc.Get("k"); v != "v1" {
+	if v := mustGet(t, c, "k"); v != "v1" {
 		t.Fatalf("overwrite failed: k = %q, want v1", v)
 	}
 }
 
 func TestCopyKeyAcross(t *testing.T) {
-	src, mrSrc, srcID := newTransferService(t)
+	src, cSrc, srcID := newTransferService(t)
 	requireDump(t, src, srcID)
-	dst, mrDst, dstID := newTransferService(t)
+	dst, cDst, dstID := newTransferService(t)
 
-	if err := mrSrc.Set("src-key", "payload"); err != nil {
-		t.Fatal(err)
-	}
-	mrSrc.SetTTL("src-key", 2*time.Hour)
+	mustSet(t, cSrc, "src-key", "payload")
+	mustExpire(t, cSrc, "src-key", 2*time.Hour)
 
 	// 跨连接复制 + 改名
 	if err := src.CopyKeyAcross(srcID, 0, dstID, 0, "src-key", "dst-key", false); err != nil {
 		t.Fatalf("CopyKeyAcross: %v", err)
 	}
-	if v, _ := mrDst.Get("dst-key"); v != "payload" {
+	if v := mustGet(t, cDst, "dst-key"); v != "payload" {
 		t.Fatalf("dst-key = %q, want payload", v)
 	}
-	if ttl := mrDst.TTL("dst-key"); ttl < 110*time.Minute || ttl > 2*time.Hour {
+	if ttl := mustTTL(t, cDst, "dst-key"); ttl < 110*time.Minute || ttl > 2*time.Hour {
 		t.Fatalf("ttl = %v, want ~2h", ttl)
 	}
 

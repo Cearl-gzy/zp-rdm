@@ -6,24 +6,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 )
 
-func newKeyService(t *testing.T) (*KeyService, *miniredis.Miniredis, string) {
-	m, mr, connID := newTestManager(t)
+func newKeyService(t *testing.T) (*KeyService, *redis.Client, string) {
+	m, seed, connID := newTestManager(t)
 	s := NewKeyService(m)
 	s.Startup(context.Background())
-	return s, mr, connID
+	return s, seed, connID
 }
 
 func TestAnalyzeKeysTTLBuckets(t *testing.T) {
-	s, mr, connID := newKeyService(t)
+	s, c, connID := newKeyService(t)
 	set := func(k string, ttl time.Duration) {
-		if err := mr.Set(k, "v"); err != nil {
-			t.Fatal(err)
-		}
+		mustSet(t, c, k, "v")
 		if ttl > 0 {
-			mr.SetTTL(k, ttl)
+			mustExpire(t, c, k, ttl)
 		}
 	}
 	set("perm:1", 0)
@@ -59,11 +57,9 @@ func TestAnalyzeKeysTTLBuckets(t *testing.T) {
 }
 
 func TestAnalyzeKeysPrefixes(t *testing.T) {
-	s, mr, connID := newKeyService(t)
+	s, c, connID := newKeyService(t)
 	for _, k := range []string{"user:1", "user:2", "user:3", "sess:1", "sess:2", "orphan"} {
-		if err := mr.Set(k, "v"); err != nil {
-			t.Fatal(err)
-		}
+		mustSet(t, c, k, "v")
 	}
 	a, err := s.AnalyzeKeys(connID, 0, ":")
 	if err != nil {
@@ -85,11 +81,9 @@ func TestAnalyzeKeysPrefixes(t *testing.T) {
 }
 
 func TestAnalyzeKeysDelimiter(t *testing.T) {
-	s, mr, connID := newKeyService(t)
+	s, c, connID := newKeyService(t)
 	for _, k := range []string{"a-b-1", "a-b-2", "a-c-1"} {
-		if err := mr.Set(k, "v"); err != nil {
-			t.Fatal(err)
-		}
+		mustSet(t, c, k, "v")
 	}
 	a, err := s.AnalyzeKeys(connID, 0, "-")
 	if err != nil {
@@ -123,11 +117,9 @@ func TestAnalyzeKeysEmptyDB(t *testing.T) {
 }
 
 func TestAnalyzeKeysTopKeysBounded(t *testing.T) {
-	s, mr, connID := newKeyService(t)
+	s, c, connID := newKeyService(t)
 	for i := 0; i < 50; i++ {
-		if err := mr.Set(fmt.Sprintf("k:%03d", i), "v"); err != nil {
-			t.Fatal(err)
-		}
+		mustSet(t, c, fmt.Sprintf("k:%03d", i), "v")
 	}
 	a, err := s.AnalyzeKeys(connID, 0, ":")
 	if err != nil {
