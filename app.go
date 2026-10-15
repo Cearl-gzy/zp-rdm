@@ -18,7 +18,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.1.1"
+const AppVersion = "1.1.2"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -129,8 +129,69 @@ func (a *App) SaveFrontendState(theme string, sidebarWidth int, lastDb map[strin
 // Version 应用版本号
 func (a *App) Version() string { return AppVersion }
 
-// CheckUpdate 检查更新（需要配置 updateManifestURL）
+// updateRepoAPI 最新 Release 的 API 地址。
+// 优先走 API：github.com 与 release-assets.githubusercontent.com 在部分网络不可达，
+// 而 api.github.com 通常可用。
+const updateRepoAPI = "https://api.github.com/repos/Cearl-gzy/zp-rdm/releases/latest"
+
+// CheckUpdate 检查更新：优先 GitHub API，失败回退更新清单
 func (a *App) CheckUpdate() (string, error) {
+	if url, err := checkUpdateViaAPI(); err == nil {
+		return url, nil
+	}
+	url, err := checkUpdateViaManifest()
+	if err != nil {
+		return "", fmt.Errorf("无法连接更新服务器（网络受限），请稍后再试")
+	}
+	return url, nil
+}
+
+func checkUpdateViaAPI() (string, error) {
+	client := &http.Client{Timeout: 8 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, updateRepoAPI, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	resp, err := client.Do(req) //nolint:gosec 地址为编译期常量
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close() //nolint:errcheck
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API 状态码 %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return "", err
+	}
+	var rel struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Assets  []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal(body, &rel); err != nil {
+		return "", err
+	}
+	ver := strings.TrimPrefix(rel.TagName, "v")
+	if ver == "" || ver == AppVersion {
+		return "", nil // 已是最新
+	}
+	for _, as := range rel.Assets {
+		if strings.HasSuffix(as.Name, "-installer.exe") {
+			return as.BrowserDownloadURL, nil
+		}
+	}
+	if rel.HTMLURL != "" {
+		return rel.HTMLURL, nil
+	}
+	return "", fmt.Errorf("Release 中未找到安装包")
+}
+
+func checkUpdateViaManifest() (string, error) {
 	if updateManifestURL == "" {
 		return "", fmt.Errorf("未配置更新源")
 	}
