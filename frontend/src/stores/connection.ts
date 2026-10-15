@@ -1,0 +1,118 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import {
+  ListConnections, SaveConnection, DeleteConnection, DuplicateConnection,
+  OpenConnection, CloseConnection, TestConnection, OpenStates,
+  ExportConnections, ImportConnections,
+} from '../../wailsjs/go/service/ConnectionService'
+import { useAppStore } from './app'
+import type { ConnectionProfile, ConnState } from '../types'
+
+export interface OpenTab {
+  id: string
+  state: ConnState
+}
+
+export const useConnectionStore = defineStore('connection', () => {
+  const profiles = ref<ConnectionProfile[]>([])
+  const openTabs = ref<OpenTab[]>([])
+  const activeTab = ref<string>('')
+  const opening = ref<string>('') // 正在打开的连接 id
+  const currentDb = ref<Record<string, number>>({})
+
+  const groups = computed(() => {
+    const map = new Map<string, ConnectionProfile[]>()
+    for (const p of profiles.value) {
+      const g = p.group || '默认分组'
+      if (!map.has(g)) map.set(g, [])
+      map.get(g)!.push(p)
+    }
+    return [...map.entries()].map(([name, items]) => ({ name, items }))
+  })
+
+  const openIds = computed(() => new Set(openTabs.value.map(t => t.id)))
+
+  async function loadProfiles() {
+    profiles.value = (await ListConnections()) as unknown as ConnectionProfile[]
+    // 恢复已打开状态（应用重启后为空，这里保持一致性）
+    const states = (await OpenStates()) as unknown as ConnState[]
+    for (const st of states || []) {
+      if (!openIds.value.has(st.id)) openTabs.value.push({ id: st.id, state: st })
+    }
+  }
+
+  async function save(p: ConnectionProfile) {
+    const saved = (await SaveConnection(p as any)) as unknown as ConnectionProfile
+    // 后端会关闭已打开的连接，前端同步关闭标签页避免状态不一致
+    if (openIds.value.has(saved.id)) closeTabLocal(saved.id)
+    await loadProfiles()
+    return saved
+  }
+
+  async function remove(id: string) {
+    await DeleteConnection(id)
+    closeTabLocal(id)
+    await loadProfiles()
+  }
+
+  async function duplicate(id: string) {
+    await DuplicateConnection(id)
+    await loadProfiles()
+  }
+
+  async function test(p: ConnectionProfile) {
+    await TestConnection(p as any)
+  }
+
+  async function open(id: string) {
+    if (openIds.value.has(id)) { activeTab.value = id; return }
+    opening.value = id
+    try {
+      const st = (await OpenConnection(id)) as unknown as ConnState
+      openTabs.value.push({ id, state: st })
+      activeTab.value = id
+      if (currentDb.value[id] === undefined) {
+        // 优先恢复上次使用的 db，其次用连接配置的默认 db
+        const app = useAppStore()
+        const prof = profiles.value.find(p => p.id === id)
+        currentDb.value[id] = app.lastDb[id] ?? prof?.db ?? 0
+      }
+    } finally {
+      opening.value = ''
+    }
+  }
+
+  async function close(id: string) {
+    await CloseConnection(id)
+    closeTabLocal(id)
+  }
+
+  function closeTabLocal(id: string) {
+    const idx = openTabs.value.findIndex(t => t.id === id)
+    if (idx >= 0) {
+      openTabs.value.splice(idx, 1)
+      if (activeTab.value === id) {
+        activeTab.value = openTabs.value[Math.min(idx, openTabs.value.length - 1)]?.id ?? ''
+      }
+    }
+  }
+
+  function setDb(id: string, db: number) {
+    currentDb.value[id] = db
+    useAppStore().setLastDb(id, db)
+  }
+
+  async function exportTo(path: string) { await ExportConnections(path) }
+  async function importFrom(path: string) {
+    const n = await ImportConnections(path)
+    await loadProfiles()
+    return n
+  }
+
+  return {
+    profiles, openTabs, activeTab, opening, currentDb,
+    groups, openIds,
+    loadProfiles, save, remove, duplicate, test, open, close, setDb,
+    exportTo, importFrom,
+  }
+})

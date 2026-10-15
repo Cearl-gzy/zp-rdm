@@ -1,0 +1,28 @@
+# Go
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Wails
+build/bin/
+build/darwin/
+build/windows/installer/tmp/
+build/windows/installer/*.exe
+frontend/wailsjs/
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 工具缓存
+.lightflow/
+frontend/package.json.md5

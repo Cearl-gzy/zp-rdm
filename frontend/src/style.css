@@ -1,0 +1,460 @@
+/* ============================================================
+   ZP RDM Design System
+   深色优先 · 单 accent(redis red) · 统一圆角 · 数字等宽
+   ============================================================ */
+
+:root {
+  /* dark palette (default) */
+  --bg-base: #0b0d12;
+  --bg-panel: #10131a;
+  --bg-elevated: #161a23;
+  --bg-inset: #0d1016;
+  --bg-hover: rgba(255, 255, 255, 0.045);
+  --bg-active: rgba(255, 255, 255, 0.07);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text-1: #e8eaf0;
+  --text-2: #9ba3b4;
+  --text-3: #5f6879;
+  --accent: #e04536;
+  --accent-hover: #eb5a4c;
+  --accent-soft: rgba(224, 69, 54, 0.12);
+  --success: #3fbf6b;
+  --warning: #f5a623;
+  --info: #5ea1f7;
+  --shadow-card: 0 1px 2px rgba(4, 6, 10, 0.35), 0 8px 24px rgba(4, 6, 10, 0.22);
+  --shadow-pop: 0 4px 12px rgba(4, 6, 10, 0.4), 0 16px 48px rgba(4, 6, 10, 0.35);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --mono: "JetBrains Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.light {
+  --bg-base: #f5f6f8;
+  --bg-panel: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-inset: #f0f1f4;
+  --bg-hover: rgba(17, 24, 39, 0.045);
+  --bg-active: rgba(17, 24, 39, 0.07);
+  --border: rgba(17, 24, 39, 0.08);
+  --border-strong: rgba(17, 24, 39, 0.16);
+  --text-1: #1c2230;
+  --text-2: #596274;
+  --text-3: #9aa2b1;
+  --accent-soft: rgba(224, 69, 54, 0.08);
+  --shadow-card: 0 1px 2px rgba(28, 34, 48, 0.05), 0 8px 24px rgba(28, 34, 48, 0.06);
+  --shadow-pop: 0 4px 12px rgba(28, 34, 48, 0.08), 0 16px 48px rgba(28, 34, 48, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app { height: 100%; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  background: var(--bg-base);
+  color: var(--text-1);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  user-select: none;
+  font-feature-settings: "cv02", "cv03", "cv04";
+}
+
+::selection { background: var(--accent-soft); color: var(--text-1); }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 138, 155, 0.35);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(128, 138, 155, 0.55); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+.mono { font-family: var(--mono); user-select: text; font-feature-settings: "liga" 0; }
+.text-2 { color: var(--text-2); }
+.text-3 { color: var(--text-3); }
+
+/* ---------- 通用容器 ---------- */
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+.glass-card:hover { border-color: var(--border-strong); }
+
+/* ---------- 状态点（语义化：仅连接状态） ---------- */
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+  background: var(--text-3);
+  transition: background 0.2s;
+}
+.status-dot.on { background: var(--success); box-shadow: 0 0 6px rgba(63, 191, 107, 0.55); }
+
+/* ---------- 键类型徽章 ---------- */
+.type-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 16px; min-width: 40px; padding: 0 5px;
+  border-radius: 4px;
+  font-size: 9.5px; font-weight: 600;
+  font-family: var(--mono); letter-spacing: 0.5px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.type-string { background: rgba(63, 191, 107, 0.13); color: #4ecf7e; }
+.type-hash   { background: rgba(245, 166, 35, 0.13); color: #f0a830; }
+.type-list   { background: rgba(94, 161, 247, 0.13); color: #6ba8f8; }
+.type-set    { background: rgba(168, 120, 245, 0.14); color: #b48af5; }
+.type-zset   { background: rgba(45, 212, 191, 0.13); color: #34d3bf; }
+.type-stream { background: rgba(240, 110, 170, 0.13); color: #f075ac; }
+
+/* ============================================================
+   Ant Design Vue 全局精调
+   ============================================================ */
+
+/* --- 按钮体系 --- */
+.ant-btn {
+  font-size: 12.5px;
+  border-radius: var(--radius-sm);
+  box-shadow: none !important;
+  transition: all 0.18s var(--ease);
+}
+.ant-btn:not(:disabled):active { transform: translateY(1px); }
+.ant-btn:disabled { opacity: 0.45; }
+.ant-btn .ant-btn-loading-icon { transition: none; }
+
+/* 主按钮：实心 */
+.ant-btn-primary:not(.ant-btn-background-ghost) {
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 500;
+}
+.ant-btn-primary:not(.ant-btn-background-ghost):not(:disabled):hover {
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  box-shadow: 0 4px 14px rgba(224, 69, 54, 0.3) !important;
+}
+.ant-btn-primary:not(.ant-btn-background-ghost):not(:disabled):active {
+  box-shadow: none !important;
+}
+
+/* 主按钮：ghost 描边（保持描边语义，悬浮只加深底色，绝不实心覆盖文字） */
+.ant-btn-background-ghost.ant-btn-primary {
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  background: transparent !important;
+}
+.ant-btn-background-ghost.ant-btn-primary:not(:disabled):hover {
+  color: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  background: var(--accent-soft) !important;
+}
+
+/* 次按钮：与输入框同级的 inset 质感 */
+.ant-btn-default:not(.ant-btn-dangerous):not(:disabled) {
+  background: var(--bg-inset);
+  border-color: var(--border);
+  color: var(--text-1);
+}
+.ant-btn-default:not(.ant-btn-dangerous):not(:disabled):hover {
+  background: var(--bg-hover) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text-1) !important;
+}
+
+/* 危险按钮：红色描边 → 悬浮淡红底 */
+.ant-btn-dangerous:not(:disabled) {
+  color: var(--accent);
+  border-color: rgba(224, 69, 54, 0.45);
+  background: transparent;
+}
+.ant-btn-dangerous:not(:disabled):hover {
+  color: var(--accent-hover) !important;
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+}
+
+/* 文字 / 链接按钮 */
+.ant-btn-text:not(:disabled):hover { background: var(--bg-hover) !important; }
+.ant-btn-text.ant-btn-dangerous:not(:disabled):hover {
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+}
+.ant-btn-link:not(:disabled) { color: var(--accent); }
+.ant-btn-link:not(:disabled):hover { color: var(--accent-hover) !important; background: transparent !important; }
+
+/* 键盘可达性：自定义按钮统一 focus 环 */
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- 输入 --- */
+.ant-input, .ant-input-affix-wrapper, .ant-input-number,
+.ant-select:not(.ant-select-customize-input) .ant-select-selector,
+.ant-input-password, .ant-input-number-input {
+  border-radius: var(--radius-sm) !important;
+}
+.ant-input, .ant-input-affix-wrapper, .ant-input-number, textarea.ant-input {
+  background: var(--bg-inset) !important;
+  border-color: var(--border) !important;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.ant-input:hover, .ant-input-affix-wrapper:hover, .ant-input-number:hover {
+  border-color: var(--border-strong) !important;
+}
+.ant-input:focus, .ant-input-affix-wrapper-focused,
+.ant-input-number-focused, .ant-select-focused .ant-select-selector {
+  background: var(--bg-elevated) !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+.ant-input::placeholder, .ant-input-number-input::placeholder { color: var(--text-3) !important; }
+
+/* --- Select --- */
+.ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  background: var(--bg-inset) !important;
+  border-color: var(--border) !important;
+}
+.ant-select-dropdown {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-pop) !important;
+  padding: 4px !important;
+}
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector { border-color: var(--border-strong) !important; }
+.ant-select-arrow { color: var(--text-3) !important; }
+.ant-select-item { border-radius: var(--radius-sm) !important; transition: background 0.12s !important; }
+.ant-select-item-option-active:not(.ant-select-item-option-selected) { background: var(--bg-hover) !important; }
+.ant-select-item-option-selected { background: var(--accent-soft) !important; color: var(--accent) !important; font-weight: 500; }
+
+/* --- 表格 --- */
+.ant-table { font-size: 12.5px !important; background: transparent !important; }
+.ant-table-thead > tr > th {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border-strong) !important;
+  color: var(--text-3) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.4px;
+  padding: 8px 12px !important;
+}
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--border) !important;
+  padding: 7px 12px !important;
+  transition: background 0.12s;
+}
+.ant-table-tbody > tr:hover > td { background: var(--bg-hover) !important; }
+.ant-table-tbody > tr:last-child > td { border-bottom: none !important; }
+.ant-table-cell::before { display: none !important; }
+
+/* --- 树 --- */
+.ant-tree { background: transparent !important; }
+.ant-tree .ant-tree-node-content-wrapper {
+  border-radius: var(--radius-sm) !important;
+  transition: background 0.12s !important;
+}
+.ant-tree .ant-tree-node-content-wrapper:hover { background: var(--bg-hover) !important; }
+.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background: var(--accent-soft) !important; }
+.ant-tree .ant-tree-switcher:hover { background: var(--bg-hover); border-radius: var(--radius-sm); }
+
+/* --- 分页 --- */
+.ant-pagination .ant-pagination-item {
+  border-radius: var(--radius-sm) !important;
+  background: transparent !important;
+  border-color: var(--border) !important;
+  transition: border-color 0.15s, background 0.15s !important;
+}
+.ant-pagination .ant-pagination-item:not(.ant-pagination-item-active):hover {
+  border-color: var(--accent) !important;
+}
+.ant-pagination .ant-pagination-item:not(.ant-pagination-item-active):hover a { color: var(--accent) !important; }
+.ant-pagination .ant-pagination-item-active {
+  border-color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+}
+.ant-pagination .ant-pagination-item-active a { color: var(--accent) !important; }
+.ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  border-radius: var(--radius-sm) !important;
+  background: transparent !important;
+  border-color: var(--border) !important;
+  transition: all 0.15s !important;
+}
+.ant-pagination .ant-pagination-prev:not(.ant-pagination-disabled):hover .ant-pagination-item-link,
+.ant-pagination .ant-pagination-next:not(.ant-pagination-disabled):hover .ant-pagination-item-link {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* --- Tabs（连接页签使用自定义，此为通用） --- */
+.ant-tabs-tab { font-size: 13px !important; transition: color 0.15s !important; }
+.ant-tabs-tab:hover { color: var(--text-1) !important; }
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn { color: var(--accent) !important; }
+.ant-tabs-ink-bar { background: var(--accent) !important; }
+
+/* --- Modal --- */
+.ant-modal-content {
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-pop) !important;
+  padding: 20px 22px !important;
+}
+.ant-modal-header { margin-bottom: 14px !important; }
+.ant-modal-title { font-size: 14px !important; font-weight: 600 !important; }
+.ant-modal-close {
+  border-radius: var(--radius-sm) !important;
+  transition: background 0.12s, color 0.12s !important;
+}
+.ant-modal-close:hover { background: var(--bg-hover) !important; color: var(--text-1) !important; }
+.ant-modal-confirm .ant-modal-confirm-title { font-size: 13.5px !important; }
+.ant-modal-confirm .ant-modal-confirm-content { color: var(--text-2) !important; }
+
+/* --- Dropdown / Menu --- */
+.ant-dropdown-menu {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-pop) !important;
+  padding: 4px !important;
+}
+.ant-dropdown-menu-item {
+  border-radius: var(--radius-sm) !important;
+  font-size: 12.5px !important;
+  padding: 6px 10px !important;
+  transition: background 0.12s !important;
+}
+.ant-dropdown-menu-item:hover { background: var(--bg-hover) !important; }
+.ant-dropdown-menu-item-selected { background: var(--accent-soft) !important; color: var(--accent) !important; }
+.ant-dropdown-menu-item-danger { color: var(--accent) !important; }
+.ant-dropdown-menu-item-danger:hover { background: var(--accent-soft) !important; color: var(--accent) !important; }
+
+/* --- Segmented --- */
+.ant-segmented {
+  background: var(--bg-inset) !important;
+  border-radius: var(--radius-md) !important;
+  padding: 3px !important;
+  border: 1px solid var(--border);
+}
+.ant-segmented-item {
+  border-radius: var(--radius-sm) !important;
+  transition: all 0.2s var(--ease) !important;
+  color: var(--text-2) !important;
+}
+.ant-segmented-item-selected {
+  background: var(--bg-elevated) !important;
+  color: var(--text-1) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 0 0 1px var(--border-strong) !important;
+}
+
+/* --- Radio button group --- */
+.ant-radio-button-wrapper {
+  background: var(--bg-inset) !important;
+  border-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+.ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+/* --- Tag --- */
+.ant-tag {
+  border-radius: 4px !important;
+  border-color: var(--border) !important;
+  background: var(--bg-hover) !important;
+  color: var(--text-2) !important;
+  font-size: 11px !important;
+}
+
+/* --- Progress --- */
+.ant-progress-inner { background: var(--bg-hover) !important; }
+
+/* --- Empty --- */
+.ant-empty-description { color: var(--text-3) !important; }
+
+/* --- Tooltip --- */
+.ant-tooltip-inner {
+  border-radius: var(--radius-sm) !important;
+  font-size: 11.5px !important;
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-strong);
+  color: var(--text-1) !important;
+  box-shadow: var(--shadow-pop) !important;
+}
+
+/* --- Checkbox / Switch --- */
+.ant-checkbox-inner { border-radius: 3px !important; }
+.ant-checkbox-checked .ant-checkbox-inner { background: var(--accent) !important; border-color: var(--accent) !important; }
+.ant-switch-checked { background: var(--accent) !important; }
+
+/* --- Message --- */
+.ant-message-notice-content {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-pop) !important;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated) !important;
+  color: var(--text-1) !important;
+}
+
+/* --- Spin --- */
+.ant-spin-dot-item { background: var(--accent) !important; }
+
+/* ---------- 布局基元 ---------- */
+.window-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-split { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+/* 主题切换时容器平滑过渡 */
+body, .sidebar, .titlebar, .main-area, .tab-body, .panel, .glass-card {
+  transition: background-color 0.22s var(--ease), border-color 0.22s var(--ease);
+}
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.18s var(--ease); }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.term-line { user-select: text; }
+
+/* 数字统一等宽展示 */
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 快捷键提示 */
+.kbd {
+  display: inline-flex; align-items: center;
+  height: 17px; padding: 0 5px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 var(--border);
+  color: var(--text-3);
+  font-size: 9.5px; font-family: var(--mono);
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
