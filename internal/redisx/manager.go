@@ -92,6 +92,7 @@ func (m *Manager) Open(ctx context.Context, p model.ConnectionProfile) (*model.C
 	st := &model.ConnState{
 		ID: p.ID, Name: p.Name, Group: p.Group, Color: p.Color,
 		DBCount: dbCount, Version: version, Mode: mode,
+		Modules: parseModuleNames(ctx, c),
 	}
 
 	m.mu.Lock()
@@ -141,6 +142,29 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true} //nolint:gosec
 	}
 	return redis.NewClient(opts), nil
+}
+
+// parseModuleNames 解析 MODULE LIST 返回的模块名列表；命令失败（老版本/受限）时返回空切片
+func parseModuleNames(ctx context.Context, c *redis.Client) []string {
+	names := []string{}
+	res, err := c.Do(ctx, "MODULE", "LIST").Result()
+	if err != nil {
+		return names
+	}
+	list, ok := res.([]interface{})
+	if !ok {
+		return names
+	}
+	for _, item := range list {
+		m, ok := item.(map[interface{}]interface{})
+		if !ok {
+			continue
+		}
+		if name, ok := m["name"].(string); ok && name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // dialThroughSSH 通过 SSH 通道拨号，并用 net.Pipe 桥接后返回。

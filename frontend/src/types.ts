@@ -32,6 +32,7 @@ export interface ConnState {
   dbCount: number
   version: string
   mode: string
+  modules: string[] // 已加载模块名（如 ReJSON-RL、search）
 }
 
 export interface KeyInfo {

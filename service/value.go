@@ -3,8 +3,10 @@ package service
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -67,6 +69,24 @@ func (s *ValueService) GetValue(connID string, db int, key string) (*model.Value
 		}
 		d.Binary = isBinaryString(v)
 		d.Length = int64(len(v))
+	case "ReJSON-RL":
+		// RedisJSON 文档：整体取出，前端格式化展示
+		v, err := c.Do(ctx, "JSON.GET", key).Text()
+		if err != nil {
+			return nil, err
+		}
+		if len(v) > maxStringRead {
+			d.StrValue = v[:maxStringRead]
+			d.Truncated = true
+		} else {
+			d.StrValue = v
+		}
+		// 根节点元素数（对象取字段数，数组取长度，标量忽略）
+		if n, err := c.Do(ctx, "JSON.OBJLEN", key, ".").Int64(); err == nil {
+			d.Length = n
+		} else if n, err := c.Do(ctx, "JSON.ARRLEN", key, ".").Int64(); err == nil {
+			d.Length = n
+		}
 	case "hash":
 		d.Length, _ = c.HLen(ctx, key).Result()
 	case "list":
@@ -93,6 +113,46 @@ func (s *ValueService) SetString(connID string, db int, key, value string, ttl i
 		return c.SetArgs(s.ctx, key, value, redis.SetArgs{KeepTTL: true}).Err()
 	}
 	return c.Set(s.ctx, key, value, durationSeconds(ttl)).Err()
+}
+
+// SetJSON 设置 JSON 文档（RedisJSON；ttl<0 保持原 TTL；ttl==0 不过期）
+func (s *ValueService) SetJSON(connID string, db int, key, value string, ttl int64) error {
+	if !json.Valid([]byte(value)) {
+		return fmt.Errorf("JSON 格式不合法")
+	}
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return err
+	}
+	ctx := s.ctx
+	// JSON.SET 不保留 TTL，需要保持时先读出再恢复
+	var keepTTL time.Duration = -1
+	if ttl < 0 {
+		keepTTL, _ = c.TTL(ctx, key).Result()
+	}
+	if err := c.Do(ctx, "JSON.SET", key, "$", value).Err(); err != nil {
+		return err
+	}
+	switch {
+	case ttl < 0:
+		if keepTTL > 0 {
+			_ = c.Expire(ctx, key, keepTTL).Err()
+		}
+	case ttl == 0:
+		_ = c.Persist(ctx, key).Err()
+	default:
+		_ = c.Expire(ctx, key, durationSeconds(ttl)).Err()
+	}
+	return nil
+}
+
+// GetFullJSON 获取完整 JSON 文档（"加载完整值"，突破预览截断）
+func (s *ValueService) GetFullJSON(connID string, db int, key string) (string, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return "", err
+	}
+	return c.Do(s.ctx, "JSON.GET", key).Text()
 }
 
 // GetFullString 获取完整字符串值（"加载完整值"，突破预览 1MB 截断）
@@ -490,6 +550,13 @@ func (s *ValueService) CreateKey(connID string, db int, key, typ, value, field s
 			field = "field"
 		}
 		if _, err := c.XAdd(ctx, &redis.XAddArgs{Stream: key, Values: []string{field, value}}).Result(); err != nil {
+			return err
+		}
+	case "json":
+		if !json.Valid([]byte(value)) {
+			return fmt.Errorf("JSON 格式不合法")
+		}
+		if err := c.Do(ctx, "JSON.SET", key, "$", value).Err(); err != nil {
 			return err
 		}
 	default:

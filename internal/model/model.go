@@ -29,13 +29,14 @@ type ConnectionProfile struct {
 
 // ConnState 连接打开后的状态
 type ConnState struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Group   string `json:"group"`
-	Color   string `json:"color"`
-	DBCount int    `json:"dbCount"`
-	Version string `json:"version"`
-	Mode    string `json:"mode"`
+	ID      string   `json:"id"`
+	Name    string   `json:"name"`
+	Group   string   `json:"group"`
+	Color   string   `json:"color"`
+	DBCount int      `json:"dbCount"`
+	Version string   `json:"version"`
+	Mode    string   `json:"mode"`
+	Modules []string `json:"modules"` // 已加载模块名（MODULE LIST），如 ReJSON-RL / search
 }
 
 // KeyInfo 键信息

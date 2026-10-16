@@ -2,12 +2,28 @@
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, DisconnectOutlined } from '@ant-design/icons-vue'
-import { GetInfo, ClientList, KillClient } from '../../wailsjs/go/service/ServerService'
+import { GetInfo, ClientList, KillClient, SearchIndexes } from '../../wailsjs/go/service/ServerService'
+import { useConnectionStore } from '../stores/connection'
 import type { InfoMap, ClientConnInfo } from '../types'
 import { formatBytes, formatDuration, formatNumber } from '../utils/format'
 import TrendChart from '../components/TrendChart.vue'
 
 const props = defineProps<{ connId: string; db: number }>()
+const conn = useConnectionStore()
+
+// 已加载模块（连接打开时由后端 MODULE LIST 探测）
+const modules = computed(() => conn.openTabs.find(t => t.id === props.connId)?.state?.modules ?? [])
+const searchIndexes = ref<string[]>([])
+
+async function loadSearchIndexes() {
+  // search 模块名常见为 search / ft / searchlight
+  if (!modules.value.some(m => /search/i.test(m))) { searchIndexes.value = []; return }
+  try {
+    searchIndexes.value = (await SearchIndexes(props.connId, props.db)) as unknown as string[]
+  } catch {
+    searchIndexes.value = []
+  }
+}
 
 const info = ref<InfoMap>({})
 const clients = ref<ClientConnInfo[]>([])
@@ -70,7 +86,7 @@ function stopAuto() {
   if (timer) { clearInterval(timer); timer = null }
 }
 
-onMounted(() => { load(); startAuto() })
+onMounted(() => { load(); startAuto(); loadSearchIndexes() })
 onBeforeUnmount(stopAuto)
 
 const server = computed(() => info.value.server ?? {})
@@ -196,6 +212,19 @@ function killClient(addr: string) {
           </div>
           <div class="sc-sub">最近保存 {{ persistence.rdb_last_save_time ? new Date(num(persistence.rdb_last_save_time) * 1000).toLocaleTimeString() : '-' }}</div>
         </div>
+      </div>
+
+      <!-- 模块 -->
+      <div class="section">
+        <div class="sec-title">已加载模块<span class="sec-count num">{{ modules.length }}</span></div>
+        <div v-if="modules.length" class="mod-list">
+          <a-tag v-for="m in modules" :key="m" class="mono mod-tag">{{ m }}</a-tag>
+          <span v-if="searchIndexes.length" class="text-3 mod-indexes">
+            RediSearch 索引：
+            <span v-for="(ix, i) in searchIndexes" :key="ix" class="mono">{{ i ? ', ' : '' }}{{ ix }}</span>
+          </span>
+        </div>
+        <div v-else class="text-3" style="font-size: 12px">未加载模块（RedisJSON / RediSearch 等模块能力不可用）</div>
       </div>
 
       <!-- 趋势 -->
@@ -384,6 +413,9 @@ function killClient(addr: string) {
   margin-bottom: 10px;
   display: flex; align-items: center; gap: 8px;
 }
+.mod-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mod-tag { margin-inline-end: 0 !important; }
+.mod-indexes { font-size: 11px; margin-left: 8px; }
 .sec-count {
   font-size: 10.5px; font-weight: 500;
   color: var(--text-3);

@@ -73,6 +73,20 @@ func (s *ServerService) GetInfo(connID string, db int, sections ...string) (map[
 	return out, nil
 }
 
+// SearchIndexes RediSearch 索引列表（FT._LIST）。
+// 未加载 search 模块时返回空切片而非报错——调用方按"无索引"展示。
+func (s *ServerService) SearchIndexes(connID string, db int) ([]string, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return nil, err
+	}
+	res, err := c.Do(s.ctx, "FT._LIST").StringSlice()
+	if err != nil {
+		return []string{}, nil
+	}
+	return res, nil
+}
+
 // DbSize 键总数
 func (s *ServerService) DbSize(connID string, db int) (int64, error) {
 	c, err := s.cli(connID, db)

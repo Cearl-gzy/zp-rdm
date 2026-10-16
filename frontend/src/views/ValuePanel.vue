@@ -11,6 +11,7 @@ import { useConnectionStore } from '../stores/connection'
 import type { ValueDetail } from '../types'
 import { formatBytes, formatTTL } from '../utils/format'
 import StringEditor from './editors/StringEditor.vue'
+import JSONEditor from './editors/JSONEditor.vue'
 import HashEditor from './editors/HashEditor.vue'
 import ListEditor from './editors/ListEditor.vue'
 import SetEditor from './editors/SetEditor.vue'
@@ -197,6 +198,12 @@ function copyName() {
             :conn-id="connId" :db="db" :key-name="keyName"
             :value="detail.strValue" :truncated="detail.truncated" :ttl="detail.ttl"
             :binary="detail.binary"
+            @saved="load"
+          />
+          <JSONEditor
+            v-else-if="detail.type === 'ReJSON-RL'"
+            :conn-id="connId" :db="db" :key-name="keyName"
+            :value="detail.strValue" :truncated="detail.truncated" :ttl="detail.ttl"
             @saved="load"
           />
           <HashEditor v-else-if="detail.type === 'hash'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />

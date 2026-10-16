@@ -50,7 +50,16 @@ const PAGE_SIZE = 500
 
 const treeData = computed<KeyNode[]>(() => buildKeyTree(keys.value, delimiter.value))
 
-const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream']
+const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream', 'ReJSON-RL']
+
+// 新建键可选类型：ReJSON-RL 模块加载时才提供 json（CreateKey 用 'json' 分支）
+const hasJsonModule = computed(() =>
+  (conn.openTabs.find(t => t.id === props.connId)?.state?.modules ?? []).some(m => /rejson/i.test(m)),
+)
+const createTypes = computed(() =>
+  hasJsonModule.value ? ['string', 'hash', 'list', 'set', 'zset', 'stream', 'json'] : keyTypes.slice(0, 6),
+)
+const jsonExample = '{"a": 1}'
 
 async function scan(reset = false) {
   if (loading.value) return
@@ -573,7 +582,7 @@ const listColumns = [
           </a-form-item>
           <a-form-item label="类型" style="flex: 1">
             <a-select v-model:value="createForm.type">
-              <a-select-option v-for="t in keyTypes" :key="t" :value="t">
+              <a-select-option v-for="t in createTypes" :key="t" :value="t">
                 <span class="type-badge" :class="`type-${t}`">{{ t }}</span>
               </a-select-option>
             </a-select>
@@ -582,8 +591,8 @@ const listColumns = [
         <a-form-item v-if="['hash', 'stream'].includes(createForm.type)" label="字段名">
           <a-input v-model:value="createForm.field" placeholder="field" class="mono" />
         </a-form-item>
-        <a-form-item :label="createForm.type === 'zset' ? '成员' : createForm.type === 'string' ? '值' : '初始值'">
-          <a-textarea v-model:value="createForm.value" :rows="3" class="mono" />
+        <a-form-item :label="createForm.type === 'zset' ? '成员' : createForm.type === 'string' ? '值' : createForm.type === 'json' ? 'JSON 文档' : '初始值'">
+          <a-textarea v-model:value="createForm.value" :rows="3" class="mono" :placeholder="createForm.type === 'json' ? jsonExample : ''" />
         </a-form-item>
         <a-form-item v-if="createForm.type === 'zset'" label="分数">
           <a-input-number v-model:value="createForm.score" style="width: 100%" />

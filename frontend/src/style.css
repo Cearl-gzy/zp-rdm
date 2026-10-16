@@ -127,6 +127,7 @@ body {
 .type-set    { background: rgba(168, 120, 245, 0.14); color: #b48af5; }
 .type-zset   { background: rgba(45, 212, 191, 0.13); color: #34d3bf; }
 .type-stream { background: rgba(240, 110, 170, 0.13); color: #f075ac; }
+.type-ReJSON-RL { background: rgba(168, 120, 245, 0.14); color: #b48af5; }
 
 /* ============================================================
    Ant Design Vue 全局精调
