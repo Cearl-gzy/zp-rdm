@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.8.0-red)
+![version](https://img.shields.io/badge/version-1.9.0-red)
 
 ---
 
@@ -92,6 +92,8 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 - **RedisJSON 编辑器** — `ReJSON-RL` 键自动识别：文本模式（语法高亮/格式化）+ 树形模式（结构浏览）；树节点悬停即可**路径级编辑**（`JSON.SET key $.path`，局部写入不动 TTL）；模块加载时新建键可选 json 类型
 - **RediSearch 查询面板** — 独立"搜索"视图：索引下拉（FT._LIST）+ schema 字段展示（名称/类型/JSONPath）+ 完整查询语法（`@field:value`、`@age:[18 30]`、`@city:{北京}`），结果分页直达数据视图
+- **FT.CREATE 索引向导** — 图形化建索引：ON JSON/HASH、多键前缀、字段表（JSONPath/别名/类型 TEXT·TAG·NUMERIC·GEO/SORTABLE），JSONPath 末段自动填别名；索引可一键删除（可选 DD 连文档删）
+- **FT.AGGREGATE 聚合面板** — 结构化构造聚合查询：过滤条件 + GROUPBY 多字段 + 聚合器（COUNT / COUNT_DISTINCT / SUM / AVG / MIN / MAX，自动别名），动态列结果表；复杂管线（LOAD/APPLY/SORTBY）可走 CLI 原生命令
 
 ### 🌐 Redis Cluster
 

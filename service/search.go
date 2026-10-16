@@ -129,6 +129,249 @@ func (s *ServerService) SearchIndexSchema(connID string, db int, index string) (
 	return fields, nil
 }
 
+// SearchIndexField 索引向导的字段定义
+type SearchIndexField struct {
+	Name     string `json:"name"`     // 别名（AS）
+	Path     string `json:"path"`     // JSONPath（ON JSON 必填；ON HASH 留空则用 Name 作字段名）
+	Type     string `json:"type"`     // TEXT / TAG / NUMERIC / GEO
+	Sortable bool   `json:"sortable"` // SORTABLE
+}
+
+// SearchCreateIndexRequest FT.CREATE 向导请求
+type SearchCreateIndexRequest struct {
+	ConnID   string             `json:"connId"`
+	DB       int                `json:"db"`
+	Name     string             `json:"name"`
+	On       string             `json:"on"` // HASH / JSON
+	Prefixes []string           `json:"prefixes"`
+	Fields   []SearchIndexField `json:"fields"`
+}
+
+var searchFieldTypes = map[string]bool{"TEXT": true, "TAG": true, "NUMERIC": true, "GEO": true}
+
+// SearchCreateIndex 建索引向导（FT.CREATE；VECTOR 等高级选项走 CLI）
+func (s *ServerService) SearchCreateIndex(req SearchCreateIndexRequest) error {
+	req.Name = strings.TrimSpace(req.Name)
+	req.On = strings.ToUpper(strings.TrimSpace(req.On))
+	if req.Name == "" {
+		return fmt.Errorf("索引名不能为空")
+	}
+	if req.On != "HASH" && req.On != "JSON" {
+		return fmt.Errorf("ON 仅支持 HASH / JSON")
+	}
+	prefixes := make([]string, 0, len(req.Prefixes))
+	for _, p := range req.Prefixes {
+		if p = strings.TrimSpace(p); p != "" {
+			prefixes = append(prefixes, p)
+		}
+	}
+	if len(prefixes) == 0 {
+		return fmt.Errorf("至少需要一个键前缀")
+	}
+	if len(req.Fields) == 0 {
+		return fmt.Errorf("至少需要一个字段")
+	}
+
+	args := []interface{}{"FT.CREATE", req.Name, "ON", req.On, "PREFIX", len(prefixes)}
+	for _, p := range prefixes {
+		args = append(args, p)
+	}
+	args = append(args, "SCHEMA")
+	for i, f := range req.Fields {
+		f.Name = strings.TrimSpace(f.Name)
+		f.Path = strings.TrimSpace(f.Path)
+		f.Type = strings.ToUpper(strings.TrimSpace(f.Type))
+		if f.Name == "" {
+			return fmt.Errorf("字段 %d 缺少别名", i+1)
+		}
+		if !searchFieldTypes[f.Type] {
+			return fmt.Errorf("字段 %s 类型 %q 不支持（TEXT/TAG/NUMERIC/GEO）", f.Name, f.Type)
+		}
+		if req.On == "JSON" {
+			if !strings.HasPrefix(f.Path, "$") {
+				return fmt.Errorf("字段 %s 需要 JSONPath（以 $ 开头）", f.Name)
+			}
+			args = append(args, f.Path, "AS", f.Name, f.Type)
+		} else {
+			field := f.Name
+			if f.Path != "" {
+				field = f.Path // ON HASH 也允许「字段名 AS 别名」
+			}
+			args = append(args, field, "AS", f.Name, f.Type)
+		}
+		if f.Sortable {
+			args = append(args, "SORTABLE")
+		}
+	}
+
+	c, err := s.cli(req.ConnID, req.DB)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, searchTimeout)
+	defer cancel()
+	if err := c.Do(ctx, args...).Err(); err != nil {
+		return fmt.Errorf("FT.CREATE 失败: %w", err)
+	}
+	return nil
+}
+
+// SearchDropIndex 删除索引（FT.DROPINDEX；deleteDocs 为 true 时带 DD 连同文档一起删）
+func (s *ServerService) SearchDropIndex(connID string, db int, index string, deleteDocs bool) error {
+	index = strings.TrimSpace(index)
+	if index == "" {
+		return fmt.Errorf("索引名不能为空")
+	}
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return err
+	}
+	args := []interface{}{"FT.DROPINDEX", index}
+	if deleteDocs {
+		args = append(args, "DD")
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, searchTimeout)
+	defer cancel()
+	if err := c.Do(ctx, args...).Err(); err != nil {
+		return fmt.Errorf("FT.DROPINDEX 失败: %w", err)
+	}
+	return nil
+}
+
+// SearchAggReducer FT.AGGREGATE 聚合器
+type SearchAggReducer struct {
+	Func  string `json:"func"`  // COUNT / COUNT_DISTINCT / SUM / AVG / MIN / MAX
+	Field string `json:"field"` // COUNT 无需字段
+	Alias string `json:"alias"` // 留空自动生成
+}
+
+// SearchAggregateRequest 聚合查询请求（GROUPBY + REDUCE + LIMIT 子集）
+type SearchAggregateRequest struct {
+	ConnID   string             `json:"connId"`
+	DB       int                `json:"db"`
+	Index    string             `json:"index"`
+	Query    string             `json:"query"` // 空按 * 处理
+	GroupBy  []string           `json:"groupBy"`
+	Reducers []SearchAggReducer `json:"reducers"`
+	Limit    int                `json:"limit"`
+}
+
+// SearchAggregateResult FT.AGGREGATE 结果（行为动态列）
+type SearchAggregateResult struct {
+	Total int64             `json:"total"`
+	Rows  []map[string]string `json:"rows"`
+}
+
+const aggMaxLimit = 1000
+
+// reducer 需要的字段参数个数；-1 表示不支持
+var aggReducerNargs = map[string]int{
+	"COUNT": 0, "COUNT_DISTINCT": 1, "SUM": 1, "AVG": 1, "MIN": 1, "MAX": 1,
+}
+
+// SearchAggregate 执行 FT.AGGREGATE（结构化构造 GROUPBY/REDUCE，原生命令可走 CLI）
+func (s *ServerService) SearchAggregate(req SearchAggregateRequest) (*SearchAggregateResult, error) {
+	req.Index = strings.TrimSpace(req.Index)
+	if req.Index == "" {
+		return nil, fmt.Errorf("索引不能为空")
+	}
+	query := strings.TrimSpace(req.Query)
+	if query == "" {
+		query = "*"
+	}
+	if req.Limit <= 0 || req.Limit > aggMaxLimit {
+		req.Limit = 100
+	}
+
+	args := []interface{}{"FT.AGGREGATE", req.Index, query}
+	if len(req.GroupBy) > 0 || len(req.Reducers) > 0 {
+		groupBy := make([]string, 0, len(req.GroupBy))
+		for _, g := range req.GroupBy {
+			if g = strings.TrimSpace(g); g != "" {
+				groupBy = append(groupBy, g)
+			}
+		}
+		args = append(args, "GROUPBY", len(groupBy))
+		for _, g := range groupBy {
+			args = append(args, "@"+strings.TrimPrefix(g, "@"))
+		}
+		for i, r := range req.Reducers {
+			r.Func = strings.ToUpper(strings.TrimSpace(r.Func))
+			r.Field = strings.TrimSpace(r.Field)
+			nargs, ok := aggReducerNargs[r.Func]
+			if !ok {
+				return nil, fmt.Errorf("聚合器 %d 不支持 %q", i+1, r.Func)
+			}
+			if nargs == 1 && r.Field == "" {
+				return nil, fmt.Errorf("聚合器 %s 需要选择字段", r.Func)
+			}
+			alias := strings.TrimSpace(r.Alias)
+			if alias == "" {
+				alias = strings.ToLower(r.Func)
+				if r.Field != "" {
+					alias += "_" + strings.TrimPrefix(r.Field, "@")
+				}
+			}
+			args = append(args, "REDUCE", r.Func, nargs)
+			if nargs == 1 {
+				args = append(args, "@"+strings.TrimPrefix(r.Field, "@"))
+			}
+			args = append(args, "AS", alias)
+		}
+	}
+	args = append(args, "LIMIT", 0, req.Limit)
+
+	c, err := s.cli(req.ConnID, req.DB)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, searchTimeout)
+	defer cancel()
+	res, err := c.Do(ctx, args...).Result()
+	if err != nil {
+		return nil, fmt.Errorf("FT.AGGREGATE 失败: %w", err)
+	}
+
+	out := &SearchAggregateResult{Rows: []map[string]string{}}
+	switch r := res.(type) {
+	case map[interface{}]interface{}: // RESP3：行在 results[].extra_attributes
+		out.Total = asInt64(mapGet(r, "total_results"))
+		results, _ := mapGet(r, "results").([]interface{})
+		for _, item := range results {
+			m, ok := item.(map[interface{}]interface{})
+			if !ok {
+				continue
+			}
+			row := map[string]string{}
+			if attrs, ok := mapGet(m, "extra_attributes").(map[interface{}]interface{}); ok {
+				for k, v := range attrs {
+					row[asString(k)] = asString(v)
+				}
+			}
+			out.Rows = append(out.Rows, row)
+		}
+	case []interface{}: // RESP2：[total, [k,v,...], ...]
+		if len(r) == 0 {
+			return nil, fmt.Errorf("FT.AGGREGATE 返回格式异常")
+		}
+		out.Total = asInt64(r[0])
+		for _, item := range r[1:] {
+			pairs, ok := item.([]interface{})
+			if !ok {
+				continue
+			}
+			row := map[string]string{}
+			for j := 0; j+1 < len(pairs); j += 2 {
+				row[asString(pairs[j])] = asString(pairs[j+1])
+			}
+			out.Rows = append(out.Rows, row)
+		}
+	default:
+		return nil, fmt.Errorf("FT.AGGREGATE 返回格式异常(%T)", res)
+	}
+	return out, nil
+}
+
 // SearchQuery 执行 FT.SEARCH（query 为 RediSearch 查询语法，原样透传）
 func (s *ServerService) SearchQuery(connID string, db int, index, query string, offset, limit int) (*SearchResult, error) {
 	index = strings.TrimSpace(index)
