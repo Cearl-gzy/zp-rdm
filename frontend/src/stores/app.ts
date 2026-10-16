@@ -8,6 +8,7 @@ export interface ConnWorkspace {
   pattern?: string
   viewMode?: string
   delimiter?: string
+  expandedKeys?: string[]
 }
 
 export interface Workspace {

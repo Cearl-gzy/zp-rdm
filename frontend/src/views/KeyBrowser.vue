@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined,
@@ -36,7 +36,39 @@ const viewMode = ref<'tree' | 'list'>(savedWs.viewMode === 'list' ? 'list' : 'tr
 const delimiter = ref(savedWs.delimiter || ':')
 const selectedKey = ref(savedWs.selectedKey ?? '')
 const checkedKeys = ref<string[]>([])
-const expandedKeys = ref<string[]>([])
+// 树展开目录：从工作区恢复并持久化
+const expandedKeys = ref<string[]>(savedWs.expandedKeys ?? [])
+const treeRef = ref<{ scrollTo?: (scroll: { key: string; align?: string }) => void } | null>(null)
+
+watch(expandedKeys, v => {
+  app.patchConnWorkspace(props.connId, { expandedKeys: [...v] })
+}, { deep: true })
+
+// 目录前缀链：'a:b:c' → ['a', 'a:b']（不含叶子本身）
+function ancestorDirs(key: string): string[] {
+  const parts = key.split(delimiter.value)
+  const out: string[] = []
+  let p = ''
+  for (let i = 0; i < parts.length - 1; i++) {
+    p = i === 0 ? parts[i] : p + delimiter.value + parts[i]
+    out.push(p)
+  }
+  return out
+}
+
+// 展开到指定键（列表模式也记录展开状态），树模式下滚动到可视区域
+function expandToKey(key: string) {
+  if (!key) return
+  const set = new Set(expandedKeys.value)
+  let changed = false
+  for (const d of ancestorDirs(key)) {
+    if (!set.has(d)) { set.add(d); changed = true }
+  }
+  if (changed) expandedKeys.value = [...set]
+  if (viewMode.value === 'tree') {
+    nextTick(() => treeRef.value?.scrollTo?.({ key, align: 'top' }))
+  }
+}
 
 // 浏览状态变化 → 防抖持久化到工作区
 watch([pattern, viewMode, delimiter], () => {
@@ -95,9 +127,15 @@ function refresh(keepSelection = false) {
 
 // 首次加载保留工作区恢复的选中键，之后切换 db/连接才清空
 let firstLoad = true
-watch(() => [props.db, props.connId], () => {
-  refresh(firstLoad)
-  firstLoad = false
+watch(() => [props.db, props.connId], async () => {
+  if (firstLoad) {
+    await scan(true)
+    firstLoad = false
+    // 恢复上次会话：展开到选中键并滚动到位
+    if (selectedKey.value) expandToKey(selectedKey.value)
+    return
+  }
+  refresh(false)
 }, { immediate: true })
 
 // F5 / Ctrl+R 刷新：仅当前激活标签页的浏览器响应
@@ -141,6 +179,7 @@ function onTreeSelect(sel: (string | number)[], info: any) {
 
 function onRowClick(record: KeyInfo) {
   selectedKey.value = record.key
+  expandToKey(record.key) // 列表模式选中后切回树视图时保持定位
 }
 
 // ---------- 新建键 ----------
@@ -163,6 +202,7 @@ async function doCreate() {
     createVisible.value = false
     refresh()
     selectedKey.value = f.key
+    expandToKey(f.key)
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   } finally {
@@ -473,6 +513,7 @@ const listColumns = [
       <div ref="contentRef" class="key-content" :class="{ 'vs-mode': viewMode === 'tree' }">
         <a-tree
           v-if="viewMode === 'tree'"
+          ref="treeRef"
           :tree-data="treeData"
           :field-names="{ title: 'title', key: 'key', children: 'children' }"
           v-model:expanded-keys="expandedKeys"

@@ -194,7 +194,7 @@ func TestWorkspace(t *testing.T) {
 		Open:   []string{"conn-a", "conn-b"},
 		Active: "conn-b",
 		Conns: map[string]*ConnWorkspace{
-			"conn-a": {View: "data", SelectedKey: "user:1", Pattern: "user:*", ViewMode: "tree", Delimiter: ":"},
+			"conn-a": {View: "data", SelectedKey: "user:1", Pattern: "user:*", ViewMode: "tree", Delimiter: ":", ExpandedKeys: []string{"user", "user:admin"}},
 			"conn-b": {View: "cli"},
 		},
 	})
@@ -215,12 +215,19 @@ func TestWorkspace(t *testing.T) {
 	if ca == nil || ca.SelectedKey != "user:1" || ca.Pattern != "user:*" || ca.Delimiter != ":" {
 		t.Fatalf("conn-a workspace lost: %+v", ca)
 	}
+	if len(ca.ExpandedKeys) != 2 || ca.ExpandedKeys[1] != "user:admin" {
+		t.Fatalf("conn-a expandedKeys lost: %+v", ca)
+	}
 
 	// Get 深拷贝：外部修改不影响内部
 	ca.SelectedKey = "MUTATED"
+	ca.ExpandedKeys[0] = "MUTATED"
 	got.Open[0] = "MUTATED"
 	if m2.Get().Workspace.Conns["conn-a"].SelectedKey != "user:1" {
 		t.Fatal("Get leaked mutable conn workspace")
+	}
+	if m2.Get().Workspace.Conns["conn-a"].ExpandedKeys[0] != "user" {
+		t.Fatal("Get leaked mutable expandedKeys slice")
 	}
 	if m2.Get().Workspace.Open[0] != "conn-a" {
 		t.Fatal("Get leaked mutable open slice")

@@ -20,11 +20,12 @@ type WindowState struct {
 
 // ConnWorkspace 单个连接的工作区状态（数据视图）
 type ConnWorkspace struct {
-	View        string `json:"view"`        // data | analysis | info | cli | slowlog | pubsub
-	SelectedKey string `json:"selectedKey"` // 数据视图中选中的键
-	Pattern     string `json:"pattern"`     // 键匹配模式
-	ViewMode    string `json:"viewMode"`    // tree | list
-	Delimiter   string `json:"delimiter"`   // 键树分隔符
+	View         string   `json:"view"`         // data | analysis | info | cli | slowlog | pubsub
+	SelectedKey  string   `json:"selectedKey"`  // 数据视图中选中的键
+	Pattern      string   `json:"pattern"`      // 键匹配模式
+	ViewMode     string   `json:"viewMode"`     // tree | list
+	Delimiter    string   `json:"delimiter"`    // 键树分隔符
+	ExpandedKeys []string `json:"expandedKeys"` // 树视图展开的目录（上限 maxExpandedKeys）
 }
 
 // Workspace 工作区会话：打开的连接标签 + 各连接的视图状态
@@ -117,6 +118,7 @@ func (m *Manager) Get() Settings {
 	}
 	for k, v := range m.data.Workspace.Conns {
 		c := *v
+		c.ExpandedKeys = append([]string{}, v.ExpandedKeys...)
 		ws.Conns[k] = &c
 	}
 	s.Workspace = ws
@@ -154,6 +156,9 @@ func (m *Manager) SaveCliHistory(history []string) error {
 // maxWorkspaceConns 工作区单连接数上限（防配置膨胀）
 const maxWorkspaceConns = 64
 
+// maxExpandedKeys 单连接持久化的树展开目录上限
+const maxExpandedKeys = 200
+
 // SaveWorkspace 保存工作区会话（打开的标签 + 各连接视图状态）
 func (m *Manager) SaveWorkspace(w Workspace) error {
 	m.mu.Lock()
@@ -173,6 +178,13 @@ func (m *Manager) SaveWorkspace(w Workspace) error {
 			}
 		}
 		w.Conns = keep
+	}
+	// 展开目录截断 + 切片独立化（避免持有前端传入的共享底层数组）
+	for _, c := range w.Conns {
+		if len(c.ExpandedKeys) > maxExpandedKeys {
+			c.ExpandedKeys = c.ExpandedKeys[:maxExpandedKeys]
+		}
+		c.ExpandedKeys = append([]string{}, c.ExpandedKeys...)
 	}
 	m.data.Workspace = w
 	return m.saveLocked()
