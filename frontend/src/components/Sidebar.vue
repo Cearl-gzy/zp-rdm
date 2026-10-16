@@ -8,7 +8,7 @@ import {
   CloudSyncOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons-vue'
 import { PickOpenFile, PickSaveFile, CheckUpdate } from '../../wailsjs/go/main/App'
-import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
+import { BrowserOpenURL, Environment } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
 import { useConnectionStore } from '../stores/connection'
 import { onAppEvent, AppEvents } from '../utils/events'
@@ -129,6 +129,16 @@ function startResize(e: MouseEvent) {
 // ---------- 关于 / 检查更新 ----------
 const aboutVisible = ref(false)
 const checking = ref(false)
+// 平台感知的密码存储说明（secrets 包目前仅 Windows DPAPI 加密）
+const platform = ref('')
+const securityText = computed(() => {
+  if (platform.value === 'windows') return '连接密码已通过 Windows DPAPI 加密存储'
+  if (platform.value === 'darwin') return '连接密码当前为明文存储（macOS 钥匙串支持计划中）'
+  return '连接密码当前为明文存储，请注意配置文件权限'
+})
+onMounted(async () => {
+  try { platform.value = (await Environment()).platform } catch { /* 忽略 */ }
+})
 async function onCheckUpdate() {
   checking.value = true
   try {
@@ -281,7 +291,7 @@ async function onCheckUpdate() {
         <div class="about-desc">轻量、精美、功能完善的 Redis 桌面管理工具</div>
         <div class="about-security">
           <SafetyCertificateOutlined />
-          <span>连接密码已通过 Windows DPAPI 加密存储</span>
+          <span>{{ securityText }}</span>
         </div>
         <a-button block :loading="checking" @click="onCheckUpdate">
           <template v-if="!checking" #icon><CloudSyncOutlined /></template>

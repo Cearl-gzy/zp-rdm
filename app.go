@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"time"
 
@@ -14,11 +15,12 @@ import (
 	"zp-rdm/internal/redisx"
 	"zp-rdm/internal/settings"
 	"zp-rdm/internal/store"
+	"zp-rdm/internal/updatecheck"
 	"zp-rdm/service"
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.4.0"
+const AppVersion = "1.5.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -181,7 +183,7 @@ func checkUpdateViaAPI() (string, error) {
 		return "", nil // 已是最新
 	}
 	for _, as := range rel.Assets {
-		if strings.HasSuffix(as.Name, "-installer.exe") {
+		if updatecheck.MatchAsset(runtime.GOOS, as.Name) {
 			return as.BrowserDownloadURL, nil
 		}
 	}
@@ -206,8 +208,9 @@ func checkUpdateViaManifest() (string, error) {
 		return "", err
 	}
 	var manifest struct {
-		Version string `json:"version"`
-		URL     string `json:"url"`
+		Version   string            `json:"version"`
+		URL       string            `json:"url"`
+		Platforms map[string]string `json:"platforms"`
 	}
 	if err := json.Unmarshal(body, &manifest); err != nil {
 		return "", fmt.Errorf("更新清单格式错误")
@@ -215,10 +218,11 @@ func checkUpdateViaManifest() (string, error) {
 	if manifest.Version == "" || manifest.Version == AppVersion {
 		return "", nil // 已是最新
 	}
-	if !strings.HasPrefix(manifest.URL, "http") {
-		return "", fmt.Errorf("更新清单缺少下载地址")
+	url := updatecheck.PickManifestURL(runtime.GOOS, runtime.GOARCH, manifest.URL, manifest.Platforms)
+	if url == "" {
+		return "", fmt.Errorf("更新清单缺少当前平台的下载地址")
 	}
-	return manifest.URL, nil
+	return url, nil
 }
 
 // PickOpenFile 打开文件选择对话框

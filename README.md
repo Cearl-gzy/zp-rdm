@@ -4,8 +4,37 @@
 
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
-![platform](https://img.shields.io/badge/platform-Windows-blue)
-![version](https://img.shields.io/badge/version-1.1.0-red)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
+![version](https://img.shields.io/badge/version-1.5.0-red)
+
+---
+
+## 安装
+
+从 [Releases](https://github.com/Cearl-gzy/zp-rdm/releases/latest) 下载对应平台：
+
+| 平台 | 文件 | 说明 |
+|---|---|---|
+| Windows | `zp-rdm-amd64-installer.exe` | NSIS 安装包（推荐）；`zp-rdm.exe` 为便携版 |
+| macOS | `zp-rdm-darwin-universal.zip` | Universal 二进制（Intel + Apple Silicon） |
+| Linux | `zp-rdm-linux-amd64.tar.gz` | 需要 GTK3 + WebKit2GTK 运行时 |
+
+**macOS**：应用未签名，首次打开需绕过 Gatekeeper：
+
+```bash
+unzip zp-rdm-darwin-universal.zip
+xattr -cr zp-rdm.app   # 移除隔离属性
+open zp-rdm.app
+```
+
+**Linux**： Debian/Ubuntu 安装运行时依赖后即可启动：
+
+```bash
+sudo apt install libwebkit2gtk-4.1-0
+tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
+```
+
+> ⚠️ 跨平台说明：连接密码加密目前仅 Windows（DPAPI）；macOS/Linux 上密码为明文存储（配置文件权限 0600），系统密钥环支持计划中。
 
 ---
 
@@ -71,7 +100,7 @@
 
 ### 🔐 安全与工程化
 
-- **DPAPI 密码加密** — 连接密码、SSH 私钥/密码/口令使用 Windows DPAPI 加密落盘（用户+机器绑定，拷走配置文件也解不开）；旧版明文配置启动时自动迁移
+- **DPAPI 密码加密**（Windows） — 连接密码、SSH 私钥/密码/口令使用 Windows DPAPI 加密落盘（用户+机器绑定，拷走配置文件也解不开）；旧版明文配置启动时自动迁移。macOS/Linux 暂为明文存储（0600 权限），系统密钥环支持计划中
 - **SSH 隧道** — 连接支持 SSH 跳板（密码/私钥/口令三种认证）
 - **工作区会话恢复** — 重启后自动恢复：打开的连接标签、激活标签、每连接的视图（数据/监控/CLI…）、选中的键、匹配模式、树/列表视图、键分隔符、上次使用的 DB
 - **窗口状态记忆** — 尺寸、位置、最大化状态、侧栏宽度（可拖拽 160–480px）、深浅主题全部持久化
@@ -98,7 +127,7 @@
 - **后端**：Go 1.21+ / Wails v2.16 / go-redis v9 / DPAPI (CryptoProtectData)
 - **前端**：Vue 3 / TypeScript / Pinia / Ant Design Vue 4 / CodeMirror 6
 - **测试**：miniredis（内存 Redis 桩）+ 真实 Redis 集成测试（CI service container）
-- **发布**：GitHub Actions（测试 → NSIS 打包 → Release + 更新清单）
+- **发布**：GitHub Actions 三平台构建（Windows NSIS / macOS universal app / Linux tar.gz → Release + 多平台更新清单）
 
 ## 开发
 
@@ -120,14 +149,14 @@ ZP_RDM_TEST_REDIS_ADDR=localhost:6379 go test ./...
 
 ## 发布
 
-push 一个 `v*` tag 即触发 GitHub Actions：全量测试 → NSIS 打包 → 自动创建 Release（含安装包、便携 exe 与更新清单 `latest.json`）。
+push 一个 `v*` tag 即触发 GitHub Actions：全量测试 → 三平台并行构建（Windows NSIS + 便携 exe / macOS universal zip / Linux tar.gz）→ 自动创建 Release（含更新清单 `latest.json`，按平台匹配下载地址）。
 
 > tag 版本号必须与 `wails.json` 的 `info.productVersion` 一致（CI 会校验，不一致直接失败）。
 
 ## 数据与安全
 
-- 配置目录：`%AppData%/zp-rdm/`（`connections.json` + `settings.json`）
-- 连接密码、SSH 私钥/密码/口令使用 **Windows DPAPI** 加密落盘，内存中保持明文
-- 旧版明文配置启动时自动迁移为密文
+- 配置目录：Windows `%AppData%/zp-rdm/`，macOS/Linux `~/.config/zp-rdm/`（`connections.json` + `settings.json`）
+- 连接密码、SSH 私钥/密码/口令：Windows 使用 **DPAPI** 加密落盘，内存中保持明文；macOS/Linux 暂为明文（0600 权限）
+- 旧版明文配置启动时自动迁移为密文（Windows）
 - ⚠️ 连接**导出文件为明文**（可移植性设计），请妥善保管导出文件
 - ⚠️ CLI 命令历史以明文保存在 `settings.json`，包含执行过的完整命令
