@@ -56,7 +56,7 @@ func newJSONValueService(t *testing.T) (*ValueService, *redis.Client, string) {
 	return s, seed, connID
 }
 
-func jsonSet(t *testing.T, c *redis.Client, key, doc string) {
+func jsonSet(t *testing.T, c redis.UniversalClient, key, doc string) {
 	t.Helper()
 	if err := c.Do(tctx, "JSON.SET", key, "$", doc).Err(); err != nil {
 		t.Fatal(err)

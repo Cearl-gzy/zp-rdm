@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/redis/go-redis/v9"
 
@@ -16,17 +17,167 @@ import (
 type KeyService struct {
 	ctx     context.Context
 	manager *redisx.Manager
+	scanMu  sync.Mutex
+	scans   map[string]*clusterScanState // 集群全节点扫描进度（按 connID）
 }
 
-func NewKeyService(m *redisx.Manager) *KeyService { return &KeyService{manager: m} }
+// clusterScanState 集群扫描状态：每个 master 节点一个游标 + 直连客户端。
+// 不用 go-redis ForEachMaster 遍历：新客户端首次加载集群状态时偶发漏节点且
+// 部分状态会跨调用缓存，导致漏扫。改为从 CLUSTER NODES 拿全量 master 地址，
+// 逐节点直连扫描（SCAN 只扫本节点 keyspace，不经槽位路由）。
+type clusterScanState struct {
+	cursors map[string]uint64        // nodeAddr → SCAN 游标
+	masters []string                 // 全量 master 地址（CLUSTER NODES）
+	nodes   map[string]*redis.Client // nodeAddr → 直连客户端
+}
+
+func (st *clusterScanState) close() {
+	for _, c := range st.nodes {
+		_ = c.Close()
+	}
+}
+
+func NewKeyService(m *redisx.Manager) *KeyService {
+	return &KeyService{manager: m, scans: make(map[string]*clusterScanState)}
+}
 
 func (s *KeyService) Startup(ctx context.Context) { s.ctx = ctx }
 
-func (s *KeyService) cli(connID string, db int) (*redis.Client, error) {
+func (s *KeyService) cli(connID string, db int) (redis.UniversalClient, error) {
 	return s.manager.Get(connID, db)
 }
 
-// ScanKeys 扫描键（游标分页）
+// scanBatch 单轮 SCAN（带 TYPE 选项，老版本退化为扫描后过滤）
+func scanBatch(ctx context.Context, c redis.UniversalClient, cursor uint64, pattern string, count int64, typ string) ([]string, uint64, error) {
+	if typ != "" {
+		batch, next, err := c.ScanType(ctx, cursor, pattern, count, typ).Result()
+		if err == nil {
+			return batch, next, nil
+		}
+	}
+	batch, next, err := c.Scan(ctx, cursor, pattern, count).Result()
+	return batch, next, err
+}
+
+// scanStandalone 单机扫描：迭代直到凑够一页或游标归零，最多 20 轮
+func scanStandalone(ctx context.Context, c redis.UniversalClient, req model.ScanRequest) ([]string, uint64, error) {
+	var keys []string
+	cursor := req.Cursor
+	for i := 0; i < 20; i++ {
+		batch, next, err := scanBatch(ctx, c, cursor, req.Pattern, req.Count, req.Type)
+		if err != nil {
+			return nil, 0, err
+		}
+		cursor = next
+		keys = append(keys, batch...)
+		if cursor == 0 || len(keys) >= int(req.Count) {
+			break
+		}
+	}
+	return keys, cursor, nil
+}
+
+// scanCluster 集群扫描：聚合所有 master 节点。
+// 游标语义对前端保持兼容：0 开始/结束，非 0 继续；各节点游标保存在服务端。
+// 每轮对每个未完成节点扫描一次，凑够一页或全部完成时返回。
+func (s *KeyService) scanCluster(ctx context.Context, cc *redis.ClusterClient, req model.ScanRequest) ([]string, uint64, error) {
+	s.scanMu.Lock()
+	if req.Cursor == 0 {
+		if old := s.scans[req.ConnID]; old != nil {
+			old.close()
+		}
+		delete(s.scans, req.ConnID) // 新一轮扫描
+	}
+	st, ok := s.scans[req.ConnID]
+	if !ok {
+		st = &clusterScanState{
+			cursors: make(map[string]uint64),
+			nodes:   make(map[string]*redis.Client),
+		}
+		s.scans[req.ConnID] = st
+	}
+	masters := st.masters
+	s.scanMu.Unlock()
+
+	if masters == nil {
+		// 首轮：从 CLUSTER NODES 解析全量 master 地址
+		if raw, err := cc.Do(ctx, "CLUSTER", "NODES").Text(); err == nil {
+			for _, n := range parseClusterNodes(raw) {
+				if n.Role == "master" {
+					masters = append(masters, n.Addr)
+				}
+			}
+		}
+		if masters == nil {
+			masters = []string{} // 解析失败：退化为空（下轮重试），避免误标完成
+		}
+		s.scanMu.Lock()
+		st.masters = masters
+		s.scanMu.Unlock()
+	}
+
+	var keys []string
+	done := len(masters) > 0
+	for _, addr := range masters {
+		s.scanMu.Lock()
+		cur, seen := st.cursors[addr]
+		nc, hasClient := st.nodes[addr]
+		s.scanMu.Unlock()
+		if seen && cur == 0 {
+			continue // 该节点已扫完
+		}
+		if !hasClient {
+			// 直连节点客户端：复用集群客户端的认证/TLS/SSH 拨号配置
+			opt := cc.Options()
+			nc = redis.NewClient(&redis.Options{
+				Addr:         addr,
+				Username:     opt.Username,
+				Password:     opt.Password,
+				DialTimeout:  opt.DialTimeout,
+				ReadTimeout:  opt.ReadTimeout,
+				WriteTimeout: opt.WriteTimeout,
+				TLSConfig:    opt.TLSConfig,
+				Dialer:       opt.Dialer,
+			})
+			s.scanMu.Lock()
+			st.nodes[addr] = nc
+			s.scanMu.Unlock()
+		}
+		batch, next, err := scanBatch(ctx, nc, cur, req.Pattern, req.Count, req.Type)
+		if err != nil {
+			return nil, 0, err
+		}
+		s.scanMu.Lock()
+		st.cursors[addr] = next
+		s.scanMu.Unlock()
+		keys = append(keys, batch...)
+		if next != 0 {
+			done = false
+		}
+	}
+	if done {
+		s.scanMu.Lock()
+		st.close()
+		delete(s.scans, req.ConnID)
+		s.scanMu.Unlock()
+		return keys, 0, nil
+	}
+	return keys, 1, nil
+}
+
+// clusterDBSize 集群键数估算：汇总全部 master 节点的 DBSIZE
+func clusterDBSize(ctx context.Context, cc *redis.ClusterClient) int64 {
+	var total int64
+	_ = cc.ForEachMaster(ctx, func(nctx context.Context, nc *redis.Client) error {
+		if n, err := nc.DBSize(nctx).Result(); err == nil {
+			total += n
+		}
+		return nil
+	})
+	return total
+}
+
+// ScanKeys 扫描键（游标分页；集群模式聚合全部 master 节点）
 func (s *KeyService) ScanKeys(req model.ScanRequest) (*model.ScanResult, error) {
 	c, err := s.cli(req.ConnID, req.DB)
 	if err != nil {
@@ -40,25 +191,14 @@ func (s *KeyService) ScanKeys(req model.ScanRequest) (*model.ScanResult, error) 
 	}
 	ctx := s.ctx
 	var keys []string
-	cursor := req.Cursor
-	// 迭代扫描直到凑够一页或游标归零，最多 20 轮
-	for i := 0; i < 20; i++ {
-		var batch []string
-		if req.Type != "" {
-			batch, cursor, err = c.ScanType(ctx, cursor, req.Pattern, req.Count, req.Type).Result()
-			if err != nil { // 老版本不支持 TYPE 选项，退化为扫描后过滤
-				batch, cursor, err = c.Scan(ctx, cursor, req.Pattern, req.Count).Result()
-			}
-		} else {
-			batch, cursor, err = c.Scan(ctx, cursor, req.Pattern, req.Count).Result()
-		}
-		if err != nil {
-			return nil, err
-		}
-		keys = append(keys, batch...)
-		if cursor == 0 || len(keys) >= int(req.Count) {
-			break
-		}
+	var cursor uint64
+	if cc, ok := c.(*redis.ClusterClient); ok {
+		keys, cursor, err = s.scanCluster(ctx, cc, req)
+	} else {
+		keys, cursor, err = scanStandalone(ctx, c, req)
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	// 管道取 TYPE / TTL / MEMORY USAGE
@@ -89,7 +229,12 @@ func (s *KeyService) ScanKeys(req model.ScanRequest) (*model.ScanResult, error) 
 		infos = append(infos, model.KeyInfo{Key: k, Type: t, TTL: ttlSeconds(ttlCmds[i].Val()), Size: size})
 	}
 
-	total, _ := c.DBSize(ctx).Result()
+	var total int64
+	if cc, ok := c.(*redis.ClusterClient); ok {
+		total = clusterDBSize(ctx, cc)
+	} else {
+		total, _ = c.DBSize(ctx).Result()
+	}
 	return &model.ScanResult{Cursor: cursor, Keys: infos, Total: total}, nil
 }
 
@@ -101,6 +246,22 @@ func (s *KeyService) DeleteKeys(connID string, db int, keys []string) (int64, er
 	}
 	if len(keys) == 0 {
 		return 0, nil
+	}
+	if _, ok := c.(*redis.ClusterClient); ok {
+		// 集群不允许跨槽多键 DEL，逐键管道（非事务管道按槽自动路由）
+		pipe := c.Pipeline()
+		cmds := make([]*redis.IntCmd, 0, len(keys))
+		for _, k := range keys {
+			cmds = append(cmds, pipe.Del(s.ctx, k))
+		}
+		if _, err := pipe.Exec(s.ctx); err != nil {
+			return 0, err
+		}
+		var n int64
+		for _, cmd := range cmds {
+			n += cmd.Val()
+		}
+		return n, nil
 	}
 	return c.Del(s.ctx, keys...).Result()
 }

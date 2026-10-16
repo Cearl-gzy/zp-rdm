@@ -34,7 +34,7 @@ func NewServerService(m *redisx.Manager) *ServerService {
 
 func (s *ServerService) Startup(ctx context.Context) { s.ctx = ctx }
 
-func (s *ServerService) cli(connID string, db int) (*redis.Client, error) {
+func (s *ServerService) cli(connID string, db int) (redis.UniversalClient, error) {
 	return s.manager.Get(connID, db)
 }
 

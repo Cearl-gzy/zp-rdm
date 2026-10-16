@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.7.0-red)
+![version](https://img.shields.io/badge/version-1.8.0-red)
 
 ---
 
@@ -48,6 +48,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
+| 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
 | 工程化 | 全平台密码加密、TLS/mTLS 连接、工作区会话恢复、SSH 隧道、命令面板、自动更新 |
 
 ---
@@ -91,6 +92,15 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 - **RedisJSON 编辑器** — `ReJSON-RL` 键自动识别：文本模式（语法高亮/格式化）+ 树形模式（结构浏览）；树节点悬停即可**路径级编辑**（`JSON.SET key $.path`，局部写入不动 TTL）；模块加载时新建键可选 json 类型
 - **RediSearch 查询面板** — 独立"搜索"视图：索引下拉（FT._LIST）+ schema 字段展示（名称/类型/JSONPath）+ 完整查询语法（`@field:value`、`@age:[18 30]`、`@city:{北京}`），结果分页直达数据视图
+
+### 🌐 Redis Cluster
+
+- **集群连接** — 连接配置勾选「集群模式」即用 ClusterClient 接入（任一节点地址即可，自动发现拓扑），仅 db 0；TLS/SSH 隧道与单机配置完全复用
+- **全节点聚合扫描** — 键浏览自动聚合全部 master 节点（服务端维护各节点 SCAN 游标，逐节点直连，规避客户端拓扑竞态漏扫）；键数为全集群 DBSIZE 汇总
+- **集群视图** — 独立「集群」面板：cluster_state / slots_assigned / 节点数 / 键数概览，节点表展示角色（主/从）、slot 区间与数量、链路状态、当前节点标记
+- **hash slot 查询** — 面板内输入任意键即算 `CLUSTER KEYSLOT`，写脚本/排查热点槽必备
+- **跨槽兼容** — 批量删除自动拆分为逐键路由，绕开集群 CROSSSLOT 限制
+- **已知限制**：键分析、MONITOR、CLI 自动补全仅覆盖单节点；RENAME 跨槽会报错（Redis 集群语义）
 
 ### 🐌 慢日志 & 发布订阅
 

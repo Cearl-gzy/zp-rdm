@@ -11,9 +11,10 @@ import CliTerminal from './CliTerminal.vue'
 import SlowLog from './SlowLog.vue'
 import PubSub from './PubSub.vue'
 import SearchPanel from './SearchPanel.vue'
+import ClusterPanel from './ClusterPanel.vue'
 import {
   DatabaseOutlined, DashboardOutlined, CodeOutlined,
-  HistoryOutlined, NotificationOutlined, PieChartOutlined, SearchOutlined,
+  HistoryOutlined, NotificationOutlined, PieChartOutlined, SearchOutlined, ClusterOutlined,
 } from '@ant-design/icons-vue'
 
 const props = defineProps<{ connId: string; state: ConnState }>()
@@ -23,9 +24,15 @@ const app = useAppStore()
 
 // RediSearch 模块加载时才提供搜索视图
 const hasSearch = computed(() => (props.state.modules ?? []).some(m => /search/i.test(m)))
-const views = computed(() => hasSearch.value
-  ? ['data', 'analysis', 'info', 'cli', 'slowlog', 'pubsub', 'search']
-  : ['data', 'analysis', 'info', 'cli', 'slowlog', 'pubsub'])
+// 集群模式提供集群视图，且只有 db 0（隐藏数据库选择器）
+const isCluster = computed(() => props.state.mode === 'cluster')
+const views = computed(() => {
+  const base = ['data', 'analysis']
+  if (isCluster.value) base.push('cluster')
+  base.push('info', 'cli', 'slowlog', 'pubsub')
+  if (hasSearch.value) base.push('search')
+  return base
+})
 const savedView = app.workspace.conns[props.connId]?.view ?? 'data'
 const activeView = ref(views.value.includes(savedView) ? savedView : 'data')
 watch(activeView, v => app.patchConnWorkspace(props.connId, { view: v }))
@@ -60,6 +67,9 @@ const dbOptions = computed(() =>
           <a-segmented-option value="analysis">
             <span class="seg-item"><PieChartOutlined /> 分析</span>
           </a-segmented-option>
+          <a-segmented-option v-if="isCluster" value="cluster">
+            <span class="seg-item"><ClusterOutlined /> 集群</span>
+          </a-segmented-option>
           <a-segmented-option value="info">
             <span class="seg-item"><DashboardOutlined /> 监控</span>
           </a-segmented-option>
@@ -80,20 +90,23 @@ const dbOptions = computed(() =>
       <div class="vh-right">
         <span class="meta-pill num">{{ state.version || 'unknown' }}</span>
         <span class="meta-pill">{{ state.mode }}</span>
-        <span class="vh-divider" />
-        <span class="text-3" style="font-size: 11.5px">数据库</span>
-        <a-select
-          v-model:value="db"
-          :options="dbOptions"
-          size="small"
-          style="width: 84px"
-        />
+        <template v-if="!isCluster">
+          <span class="vh-divider" />
+          <span class="text-3" style="font-size: 11.5px">数据库</span>
+          <a-select
+            v-model:value="db"
+            :options="dbOptions"
+            size="small"
+            style="width: 84px"
+          />
+        </template>
       </div>
     </div>
 
     <div class="view-body">
       <KeyBrowser v-show="activeView === 'data'" :conn-id="connId" :db="db" />
       <KeyAnalysis v-if="activeView === 'analysis'" :conn-id="connId" :db="db" />
+      <ClusterPanel v-if="activeView === 'cluster'" :conn-id="connId" />
       <ServerInfo v-if="activeView === 'info'" :conn-id="connId" :db="db" />
       <CliTerminal v-show="activeView === 'cli'" :conn-id="connId" :db="db" />
       <SlowLog v-if="activeView === 'slowlog'" :conn-id="connId" :db="db" />

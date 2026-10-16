@@ -2,11 +2,14 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // MONITOR 命令流（go-redis 无公开流式 API，用裸连接 + 手写 RESP 实现）
@@ -54,18 +57,36 @@ func (s *ServerService) StartMonitor(connID string, db int) error {
 	}
 	s.mu.Unlock()
 
-	opt := c.Options()
-	dialer := opt.Dialer
+	// MONITOR 需要裸连接。单机取 client 配置；集群取种子节点地址
+	// （MONITOR 只能看到单个节点的命令流，集群模式的已知限制）。
+	var addr, network, username, password string
+	var dbSel int
+	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+	var tlsCfg *tls.Config
+	switch cli := c.(type) {
+	case *redis.Client:
+		opt := cli.Options()
+		addr, network = opt.Addr, opt.Network
+		username, password, dbSel = opt.Username, opt.Password, opt.DB
+		dialer, tlsCfg = opt.Dialer, opt.TLSConfig
+	case *redis.ClusterClient:
+		opt := cli.Options()
+		addr, network = opt.Addrs[0], "tcp"
+		username, password = opt.Username, opt.Password
+		dialer, tlsCfg = opt.Dialer, opt.TLSConfig
+	default:
+		return fmt.Errorf("不支持的客户端类型 %T", c)
+	}
 	if dialer == nil {
 		d := &net.Dialer{Timeout: 8 * time.Second}
 		dialer = d.DialContext
 	}
-	raw, err := dialer(s.ctx, opt.Network, opt.Addr)
+	raw, err := dialer(s.ctx, network, addr)
 	if err != nil {
 		return fmt.Errorf("连接失败: %w", err)
 	}
-	if opt.TLSConfig != nil {
-		tc := tls.Client(raw, opt.TLSConfig)
+	if tlsCfg != nil {
+		tc := tls.Client(raw, tlsCfg)
 		if err := tc.Handshake(); err != nil {
 			_ = raw.Close()
 			return fmt.Errorf("TLS 握手失败: %w", err)
@@ -80,11 +101,11 @@ func (s *ServerService) StartMonitor(connID string, db int) error {
 		return err
 	}
 	// 认证 + 选库 + MONITOR
-	if opt.Password != "" {
-		if opt.Username != "" {
-			err = writeRESP(w, "AUTH", opt.Username, opt.Password)
+	if password != "" {
+		if username != "" {
+			err = writeRESP(w, "AUTH", username, password)
 		} else {
-			err = writeRESP(w, "AUTH", opt.Password)
+			err = writeRESP(w, "AUTH", password)
 		}
 		if err != nil {
 			return fail(err)
@@ -93,8 +114,8 @@ func (s *ServerService) StartMonitor(connID string, db int) error {
 			return fail(fmt.Errorf("认证失败: %w", err))
 		}
 	}
-	if opt.DB != 0 {
-		if err := writeRESP(w, "SELECT", fmt.Sprintf("%d", opt.DB)); err != nil {
+	if dbSel != 0 {
+		if err := writeRESP(w, "SELECT", fmt.Sprintf("%d", dbSel)); err != nil {
 			return fail(err)
 		}
 		if _, err := readRESPLine(r); err != nil {

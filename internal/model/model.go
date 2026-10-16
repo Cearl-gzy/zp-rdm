@@ -30,6 +30,7 @@ type ConnectionProfile struct {
 	DB            int       `json:"db"`
 	SSH           SSHConfig `json:"ssh"`
 	Color         string    `json:"color"`
+	Cluster       bool      `json:"cluster"` // Redis Cluster 模式（仅 db 0，多节点）
 }
 
 // ConnState 连接打开后的状态
@@ -176,6 +177,18 @@ type StreamPendingEntry struct {
 	Consumer      string `json:"consumer"`
 	IdleMs        int64  `json:"idleMs"`
 	DeliveryCount int64  `json:"deliveryCount"`
+}
+
+// ClusterNode 集群节点（CLUSTER NODES 解析）
+type ClusterNode struct {
+	ID        string   `json:"id"`
+	Addr      string   `json:"addr"`
+	Role      string   `json:"role"` // master | slave
+	MasterID  string   `json:"masterId"`
+	LinkState string   `json:"linkState"`
+	Slots     []string `json:"slots"` // 如 ["0-5460", "10000"]
+	SlotCount int      `json:"slotCount"`
+	Myself    bool     `json:"myself"`
 }
 
 // SlowLogEntry 慢日志条目

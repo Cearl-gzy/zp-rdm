@@ -27,7 +27,7 @@ func NewValueService(m *redisx.Manager) *ValueService { return &ValueService{man
 
 func (s *ValueService) Startup(ctx context.Context) { s.ctx = ctx }
 
-func (s *ValueService) cli(connID string, db int) (*redis.Client, error) {
+func (s *ValueService) cli(connID string, db int) (redis.UniversalClient, error) {
 	return s.manager.Get(connID, db)
 }
 

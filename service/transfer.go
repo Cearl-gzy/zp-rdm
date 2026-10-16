@@ -31,12 +31,12 @@ func NewTransferService(m *redisx.Manager) *TransferService { return &TransferSe
 
 func (s *TransferService) Startup(ctx context.Context) { s.ctx = ctx }
 
-func (s *TransferService) cli(connID string, db int) (*redis.Client, error) {
+func (s *TransferService) cli(connID string, db int) (redis.UniversalClient, error) {
 	return s.manager.Get(connID, db)
 }
 
 // dumpKeys 批量取 DUMP + PTTL + TYPE（全类型无损序列化）
-func (s *TransferService) dumpKeys(c *redis.Client, keys []string) ([]model.DumpedKey, error) {
+func (s *TransferService) dumpKeys(c redis.UniversalClient, keys []string) ([]model.DumpedKey, error) {
 	ctx := s.ctx
 	pipe := c.Pipeline()
 	dumpCmds := make([]*redis.StringCmd, len(keys))

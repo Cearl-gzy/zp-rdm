@@ -26,16 +26,16 @@ type entry struct {
 	state   *model.ConnState
 }
 
-// Manager 管理所有打开的 Redis 连接（按 connID|db 缓存 client）
+// Manager 管理所有打开的 Redis 连接（按 connID|db 缓存 client；集群连接固定 db 0）
 type Manager struct {
 	mu      sync.Mutex
-	clients map[string]*redis.Client
+	clients map[string]redis.UniversalClient
 	entries map[string]*entry
 }
 
 func NewManager() *Manager {
 	return &Manager{
-		clients: make(map[string]*redis.Client),
+		clients: make(map[string]redis.UniversalClient),
 		entries: make(map[string]*entry),
 	}
 }
@@ -74,7 +74,9 @@ func (m *Manager) Open(ctx context.Context, p model.ConnectionProfile) (*model.C
 	}
 
 	dbCount := 16
-	if res, err := c.ConfigGet(ctx, "databases").Result(); err == nil {
+	if p.Cluster {
+		dbCount = 1 // 集群模式只有 db 0
+	} else if res, err := c.ConfigGet(ctx, "databases").Result(); err == nil {
 		if v, ok := res["databases"]; ok {
 			if n, err := strconv.Atoi(v); err == nil && n > 0 {
 				dbCount = n
@@ -124,7 +126,32 @@ func (m *Manager) Test(ctx context.Context, p model.ConnectionProfile) error {
 	return c.Ping(tctx).Err()
 }
 
-func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Client) (*redis.Client, error) {
+func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Client) (redis.UniversalClient, error) {
+	var tlsCfg *tls.Config
+	if p.UseTLS {
+		tc, err := buildTLSConfig(p)
+		if err != nil {
+			return nil, err
+		}
+		tlsCfg = tc
+	}
+	if p.Cluster {
+		opts := &redis.ClusterOptions{
+			Addrs:        []string{fmt.Sprintf("%s:%d", p.Host, p.Port)},
+			Username:     p.Username,
+			Password:     p.Password,
+			DialTimeout:  8 * time.Second,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 30 * time.Second,
+			TLSConfig:    tlsCfg,
+		}
+		if sshCli != nil {
+			opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialThroughSSH(sshCli, network, addr)
+			}
+		}
+		return redis.NewClusterClient(opts), nil
+	}
 	opts := &redis.Options{
 		Addr:         fmt.Sprintf("%s:%d", p.Host, p.Port),
 		Username:     p.Username,
@@ -133,18 +160,12 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 		DialTimeout:  8 * time.Second,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
+		TLSConfig:    tlsCfg,
 	}
 	if sshCli != nil {
 		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return dialThroughSSH(sshCli, network, addr)
 		}
-	}
-	if p.UseTLS {
-		tc, err := buildTLSConfig(p)
-		if err != nil {
-			return nil, err
-		}
-		opts.TLSConfig = tc
 	}
 	return redis.NewClient(opts), nil
 }
@@ -184,7 +205,7 @@ func buildTLSConfig(p model.ConnectionProfile) (*tls.Config, error) {
 }
 
 // parseModuleNames 解析 MODULE LIST 返回的模块名列表；命令失败（老版本/受限）时返回空切片
-func parseModuleNames(ctx context.Context, c *redis.Client) []string {
+func parseModuleNames(ctx context.Context, c redis.UniversalClient) []string {
 	names := []string{}
 	res, err := c.Do(ctx, "MODULE", "LIST").Result()
 	if err != nil {
@@ -228,15 +249,18 @@ func proxyAndClose(dst, src net.Conn) {
 	_ = src.Close()
 }
 
-// Get 获取指定 db 的 client（懒创建）
-func (m *Manager) Get(connID string, db int) (*redis.Client, error) {
-	k := clientKey(connID, db)
+// Get 获取指定 db 的 client（懒创建；集群连接忽略 db，固定返回 db 0 的集群 client）
+func (m *Manager) Get(connID string, db int) (redis.UniversalClient, error) {
 	m.mu.Lock()
-	if c, ok := m.clients[k]; ok {
+	e, ok := m.entries[connID]
+	if ok && e.profile.Cluster {
+		db = 0
+	}
+	k := clientKey(connID, db)
+	if c, hit := m.clients[k]; hit {
 		m.mu.Unlock()
 		return c, nil
 	}
-	e, ok := m.entries[connID]
 	m.mu.Unlock()
 	if !ok {
 		return nil, errors.New("连接未打开")
@@ -249,6 +273,16 @@ func (m *Manager) Get(connID string, db int) (*redis.Client, error) {
 	m.clients[k] = c
 	m.mu.Unlock()
 	return c, nil
+}
+
+// IsCluster 连接是否为集群模式（未打开返回 false）
+func (m *Manager) IsCluster(connID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if e, ok := m.entries[connID]; ok {
+		return e.profile.Cluster
+	}
+	return false
 }
 
 // State 返回连接状态（未打开返回 nil）

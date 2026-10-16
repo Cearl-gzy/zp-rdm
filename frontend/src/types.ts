@@ -26,6 +26,7 @@ export interface ConnectionProfile {
   db: number
   ssh: SSHConfig
   color: string
+  cluster?: boolean // Redis Cluster 模式
 }
 
 export interface ConnState {
@@ -91,6 +92,17 @@ export interface StreamGroup {
 }
 export interface StreamConsumer { name: string; pending: number; idleMs: number }
 export interface StreamPendingEntry { id: string; consumer: string; idleMs: number; deliveryCount: number }
+
+export interface ClusterNode {
+  id: string
+  addr: string
+  role: string // master | slave
+  masterId: string
+  linkState: string
+  slots: string[]
+  slotCount: number
+  myself: boolean
+}
 
 export interface ScanItems {
   cursor: number

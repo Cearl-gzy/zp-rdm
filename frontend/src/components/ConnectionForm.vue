@@ -18,7 +18,7 @@ function emptyProfile(): ConnectionProfile {
     id: '', name: '', group: '', host: '127.0.0.1', port: 6379,
     username: '', password: '', useTls: false,
     tlsSkipVerify: true, tlsCaCert: '', tlsClientCert: '', tlsClientKey: '',
-    db: 0, color: COLORS[0],
+    db: 0, color: COLORS[0], cluster: false,
     ssh: { enabled: false, host: '', port: 22, username: '', authType: 'password', password: '', privateKey: '', passphrase: '' },
   }
 }
@@ -127,6 +127,9 @@ async function onSave() {
           </div>
           <a-form-item>
             <a-checkbox v-model:checked="form.useTls">启用 TLS/SSL（详细选项见「TLS」页）</a-checkbox>
+            <a-checkbox v-model:checked="form.cluster" style="margin-left: 16px">
+              Redis Cluster 集群模式（仅 db 0）
+            </a-checkbox>
           </a-form-item>
         </a-form>
       </a-tab-pane>
