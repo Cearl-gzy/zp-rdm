@@ -6,9 +6,11 @@ import {
   PauseOutlined, CaretRightOutlined,
 } from '@ant-design/icons-vue'
 import { ExecCommand } from '../../wailsjs/go/service/CliService'
+import { SuggestKeys } from '../../wailsjs/go/service/KeyService'
 import { StartMonitor, StopMonitor } from '../../wailsjs/go/service/ServerService'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
+import { REDIS_COMMANDS, REDIS_SUBCOMMANDS } from '../utils/redisCommands'
 import type { CliResult } from '../types'
 
 const props = defineProps<{ connId: string; db: number }>()
@@ -26,8 +28,83 @@ const input = ref('')
 const historyIdx = ref(-1)
 const running = ref(false)
 const outputRef = ref<HTMLElement>()
-const inputRef = ref<{ focus: () => void }>()
+const inputRef = ref<HTMLInputElement>()
 let seq = 0
+
+// ---------- Tab 自动补全（命令 / 子命令 / 键名） ----------
+const cands = ref<string[]>([])
+const candIdx = ref(0)
+const candOpen = ref(false)
+let enterPicked = false // Enter 用于选中候选时，拦截随后的 keyup.enter 触发执行
+
+interface Tok { start: number; prefix: string; index: number }
+
+// 光标所在 token：start 为 token 起始下标，index 为第几个参数（0 = 命令名）
+function currentToken(): Tok {
+  const text = input.value
+  const cursor = inputRef.value?.selectionStart ?? text.length
+  const before = text.slice(0, cursor)
+  const start = before.lastIndexOf(' ') + 1
+  const index = before.slice(0, start).trim().split(/\s+/).filter(Boolean).length
+  return { start, prefix: before.slice(start), index }
+}
+
+function closeCands() {
+  candOpen.value = false
+  cands.value = []
+  candIdx.value = 0
+}
+
+async function complete() {
+  const tok = currentToken()
+  const cmdName = input.value.trim().split(/\s+/)[0]?.toUpperCase() ?? ''
+  let list: string[] = []
+  if (tok.index === 0) {
+    const p = tok.prefix.toUpperCase()
+    list = REDIS_COMMANDS.filter(c => c.startsWith(p) && c !== p)
+  } else if (tok.index === 1 && REDIS_SUBCOMMANDS[cmdName]) {
+    const p = tok.prefix.toUpperCase()
+    list = REDIS_SUBCOMMANDS[cmdName].filter(s => s.startsWith(p) && s !== p)
+  } else {
+    // 其余参数位按键名补全（异步，需防过期响应）
+    try {
+      list = await SuggestKeys(props.connId, props.db, tok.prefix)
+    } catch {
+      list = []
+    }
+    const now = currentToken()
+    if (now.start !== tok.start || now.prefix !== tok.prefix) return // 期间输入已变化
+    list = list.filter(k => k !== tok.prefix)
+  }
+  if (!list.length) { closeCands(); return }
+  if (list.length === 1) {
+    cands.value = list
+    applyCand(0)
+    return
+  }
+  cands.value = list
+  candIdx.value = 0
+  candOpen.value = true
+}
+
+function applyCand(i: number) {
+  const c = cands.value[i]
+  if (c === undefined) return
+  const tok = currentToken()
+  const text = input.value
+  const cursor = inputRef.value?.selectionStart ?? text.length
+  let end = text.indexOf(' ', cursor)
+  if (end === -1) end = text.length
+  const head = text.slice(0, tok.start)
+  const tail = text.slice(end)
+  input.value = head + c + (tail.startsWith(' ') ? tail : ' ' + tail)
+  const pos = head.length + c.length + 1
+  closeCands()
+  nextTick(() => {
+    inputRef.value?.setSelectionRange(pos, pos)
+    inputRef.value?.focus()
+  })
+}
 
 function parseArgs(cmd: string): string[] {
   const args: string[] = []
@@ -98,6 +175,36 @@ async function doExec(cmd: string) {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // 候选面板打开时优先处理导航/选择键
+  if (candOpen.value) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      candIdx.value = (candIdx.value + 1) % cands.value.length
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      candIdx.value = (candIdx.value - 1 + cands.value.length) % cands.value.length
+      return
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      if (e.key === 'Enter') enterPicked = true
+      applyCand(candIdx.value)
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closeCands()
+      return
+    }
+    closeCands() // 其他按键关闭面板，继续走正常逻辑
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault()
+    complete()
+    return
+  }
   const history = app.cliHistory
   if (e.key === 'ArrowUp') {
     e.preventDefault()
@@ -116,6 +223,12 @@ function onKeydown(e: KeyboardEvent) {
       input.value = ''
     }
   }
+}
+
+// Enter 选中补全候选后，随后的 keyup.enter 不应再触发执行
+function onEnterKeyup() {
+  if (enterPicked) { enterPicked = false; return }
+  exec()
 }
 
 function renderValue(val: any, depth = 0): string {
@@ -194,7 +307,7 @@ onMounted(() => inputRef.value?.focus())
       <a-segmented v-model:value="mode" size="small"
         :options="[{ value: 'cmd', label: '命令' }, { value: 'monitor', label: 'MONITOR' }]" />
       <span v-if="mode === 'cmd'" class="text-3" style="font-size: 11px">
-        支持任意 Redis 命令，↑↓ 翻历史，危险命令需确认
+        支持任意 Redis 命令，↑↓ 翻历史，Tab 补全命令/键名，危险命令需确认
       </span>
       <div class="toolbar-actions">
         <template v-if="mode === 'monitor' && monOn">
@@ -229,20 +342,33 @@ onMounted(() => inputRef.value?.focus())
         </div>
       </div>
 
-      <div class="cli-input-row">
-        <span class="prompt mono">db{{ db }}&gt;</span>
-        <input
-          ref="inputRef"
-          v-model="input"
-          class="cli-input mono"
-          placeholder="输入 Redis 命令…"
-          spellcheck="false"
-          @keydown="onKeydown"
-          @keyup.enter="exec"
-        />
-        <a-button size="small" type="primary" :loading="running" @click="exec">
-          <template #icon><EnterOutlined /></template>
-        </a-button>
+      <div class="cli-input-wrap">
+        <div v-if="candOpen" class="cand-list mono">
+          <div
+            v-for="(c, i) in cands"
+            :key="c"
+            class="cand-item"
+            :class="{ active: i === candIdx }"
+            @mousedown.prevent="applyCand(i)"
+            @mouseenter="candIdx = i"
+          >{{ c }}</div>
+          <div class="cand-hint">↑↓ 选择 · Tab/Enter 确认 · Esc 关闭</div>
+        </div>
+        <div class="cli-input-row">
+          <span class="prompt mono">db{{ db }}&gt;</span>
+          <input
+            ref="inputRef"
+            v-model="input"
+            class="cli-input mono"
+            placeholder="输入 Redis 命令…"
+            spellcheck="false"
+            @keydown="onKeydown"
+            @keyup.enter="onEnterKeyup"
+          />
+          <a-button size="small" type="primary" :loading="running" @click="exec">
+            <template #icon><EnterOutlined /></template>
+          </a-button>
+        </div>
       </div>
     </template>
 
@@ -317,6 +443,40 @@ onMounted(() => inputRef.value?.focus())
 .res-int { color: var(--info); border-left: 2px solid var(--info); }
 .res-nil { color: var(--text-3); border-left: 2px solid var(--text-3); }
 .res-error { color: #ff8a80; border-left: 2px solid var(--accent); }
+.cli-input-wrap { position: relative; flex-shrink: 0; }
+.cand-list {
+  position: absolute;
+  bottom: 100%;
+  left: 12px;
+  min-width: 220px;
+  max-width: 60%;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 20;
+  padding: 4px;
+}
+.cand-item {
+  padding: 3px 10px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cand-item.active { background: var(--accent-soft); color: var(--text-1); }
+.cand-hint {
+  padding: 3px 10px;
+  font-size: 10px;
+  color: var(--text-3);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
 .cli-input-row {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 18px;

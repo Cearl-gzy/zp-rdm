@@ -4,9 +4,9 @@ import { message, Modal } from 'ant-design-vue'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined,
   FolderOutlined, UnorderedListOutlined, PartitionOutlined, DatabaseOutlined,
-  MoreOutlined, DownloadOutlined, UploadOutlined,
+  MoreOutlined, DownloadOutlined, UploadOutlined, DownOutlined,
 } from '@ant-design/icons-vue'
-import { ScanKeys, DeleteKeys } from '../../wailsjs/go/service/KeyService'
+import { ScanKeys, DeleteKeys, BatchSetTTL, MoveKeys } from '../../wailsjs/go/service/KeyService'
 import { CreateKey } from '../../wailsjs/go/service/ValueService'
 import { ExportKeys, ExportDatabase, ImportKeys } from '../../wailsjs/go/service/TransferService'
 import { PickSaveFile, PickOpenFile } from '../../wailsjs/go/main/App'
@@ -198,6 +198,69 @@ function onRenamed(oldKey: string, newKey: string) {
   selectedKey.value = newKey
 }
 
+// ---------- 批量 TTL / 移动 DB ----------
+const ttlVisible = ref(false)
+const ttlSeconds = ref(3600)
+const ttlRunning = ref(false)
+const moveVisible = ref(false)
+const moveTargetDb = ref(1)
+const moveRunning = ref(false)
+
+// 当前连接的 db 总数（用于移动目标上限提示）
+const dbCount = computed(() => conn.openTabs.find(t => t.id === props.connId)?.state?.dbCount ?? 16)
+
+function onBatchAction({ key }: { key: string }) {
+  if (!checkedLeafKeys().length) { message.warning('未选中有效键'); return }
+  if (key === 'ttl') { ttlSeconds.value = 3600; ttlVisible.value = true }
+  else if (key === 'ttl-clear') clearCheckedTTL()
+  else if (key === 'move') { moveTargetDb.value = props.db === 0 ? 1 : 0; moveVisible.value = true }
+}
+
+async function setCheckedTTL(seconds: number) {
+  const targets = checkedLeafKeys()
+  ttlRunning.value = true
+  try {
+    const n = await BatchSetTTL(props.connId, props.db, targets, seconds)
+    message.success(seconds < 0 ? `已清除 ${n} 个键的 TTL` : `已为 ${n} 个键设置 TTL ${seconds}s`)
+    if (seconds < 0) return
+    ttlVisible.value = false
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    ttlRunning.value = false
+  }
+}
+
+function clearCheckedTTL() {
+  Modal.confirm({
+    title: '清除 TTL',
+    content: `确定清除选中键的过期时间（变为永久）吗？`,
+    okText: '清除',
+    cancelText: '取消',
+    onOk: () => setCheckedTTL(-1),
+  })
+}
+
+async function doMoveChecked() {
+  const targets = checkedLeafKeys()
+  if (moveTargetDb.value === props.db) { message.warning('目标 DB 与当前相同'); return }
+  moveRunning.value = true
+  try {
+    const n = await MoveKeys(props.connId, props.db, targets, moveTargetDb.value)
+    const skipped = targets.length - n
+    message.success(skipped > 0
+      ? `已移动 ${n} 个键到 db${moveTargetDb.value}，${skipped} 个因目标存在同名键被跳过`
+      : `已移动 ${n} 个键到 db${moveTargetDb.value}`)
+    moveVisible.value = false
+    // 移动的键已不在当前 db，先从本地列表移除移动成功的部分无法区分，直接刷新
+    refresh()
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    moveRunning.value = false
+  }
+}
+
 // ---------- 数据导入导出 ----------
 // 勾选中过滤出真实叶子键
 function checkedLeafKeys(): string[] {
@@ -373,16 +436,24 @@ const listColumns = [
           </template>
         </a-dropdown>
         <transition name="fade">
-          <a-button
-            v-if="checkedKeys.length"
-            size="small"
-            danger
-            class="batch-del"
-            @click="deleteChecked"
-          >
-            <template #icon><DeleteOutlined /></template>
-            删除 {{ checkedKeys.length }}
-          </a-button>
+          <div v-if="checkedKeys.length" class="batch-bar">
+            <a-dropdown trigger="click">
+              <a-button size="small">
+                批量操作 {{ checkedKeys.length }} <DownOutlined />
+              </a-button>
+              <template #overlay>
+                <a-menu @click="onBatchAction">
+                  <a-menu-item key="ttl">设置 TTL…</a-menu-item>
+                  <a-menu-item key="ttl-clear">清除 TTL</a-menu-item>
+                  <a-menu-item key="move">移动到其他 DB…</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-button size="small" danger class="batch-del" @click="deleteChecked">
+              <template #icon><DeleteOutlined /></template>
+              删除
+            </a-button>
+          </div>
         </transition>
       </div>
       <div v-if="exportDbRunning" class="export-progress">
@@ -564,6 +635,46 @@ const listColumns = [
         </div>
       </a-form>
     </a-modal>
+
+    <!-- 批量设置 TTL -->
+    <a-modal
+      v-model:open="ttlVisible"
+      title="批量设置 TTL"
+      width="420px"
+      ok-text="设置"
+      cancel-text="取消"
+      :confirm-loading="ttlRunning"
+      @ok="setCheckedTTL(ttlSeconds)"
+    >
+      <a-form layout="vertical" size="small">
+        <a-form-item :label="`过期时间（秒），将应用于 ${checkedLeafKeys().length} 个键`">
+          <a-input-number v-model:value="ttlSeconds" :min="1" style="width: 100%" />
+        </a-form-item>
+        <div class="text-3" style="font-size: 11px">
+          常用：300（5 分钟）· 3600（1 小时）· 86400（1 天）· 604800（7 天）
+        </div>
+      </a-form>
+    </a-modal>
+
+    <!-- 批量移动到其他 DB -->
+    <a-modal
+      v-model:open="moveVisible"
+      title="批量移动到 DB"
+      width="420px"
+      ok-text="移动"
+      cancel-text="取消"
+      :confirm-loading="moveRunning"
+      @ok="doMoveChecked"
+    >
+      <a-form layout="vertical" size="small">
+        <a-form-item :label="`目标 DB（当前 db${db}，共 ${dbCount} 个）`">
+          <a-input-number v-model:value="moveTargetDb" :min="0" :max="dbCount - 1" style="width: 100%" />
+        </a-form-item>
+        <div class="text-3" style="font-size: 11px; line-height: 1.6">
+          使用 MOVE 语义：目标 DB 已存在同名键时该键会被跳过（不覆盖）。
+        </div>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -609,7 +720,7 @@ const listColumns = [
   color: var(--text-1);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), inset 0 0 0 1px var(--border-strong);
 }
-.batch-del { margin-left: auto; }
+.batch-bar { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .export-progress {
   display: flex; align-items: center; justify-content: space-between;
   padding: 4px 14px;

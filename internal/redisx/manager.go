@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strconv"
@@ -133,13 +134,35 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 	}
 	if sshCli != nil {
 		opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return sshCli.Dial(network, addr)
+			return dialThroughSSH(sshCli, network, addr)
 		}
 	}
 	if p.UseTLS {
 		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true} //nolint:gosec
 	}
 	return redis.NewClient(opts), nil
+}
+
+// dialThroughSSH 通过 SSH 通道拨号，并用 net.Pipe 桥接后返回。
+// SSH 通道不支持 SetDeadline（go-redis 依赖它实现读/写超时），
+// 因此把支持 deadline 的 net.Pipe 一端交给 go-redis，后台做双向转发。
+func dialThroughSSH(sshCli *ssh.Client, network, addr string) (net.Conn, error) {
+	rc, err := sshCli.Dial(network, addr)
+	if err != nil {
+		return nil, err
+	}
+	cli, pipe := net.Pipe()
+	go proxyAndClose(rc, pipe) // 客户端写入 → ssh
+	go proxyAndClose(pipe, rc) // ssh 返回 → 客户端读取
+	return cli, nil
+}
+
+// proxyAndClose 把 src 的数据拷到 dst；任一端结束后两端一起关闭，
+// 释放另一侧阻塞中的读写，避免 goroutine 泄漏。
+func proxyAndClose(dst, src net.Conn) {
+	_, _ = io.Copy(dst, src)
+	_ = dst.Close()
+	_ = src.Close()
 }
 
 // Get 获取指定 db 的 client（懒创建）
