@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { SaveOutlined, FormatPainterOutlined, CloudDownloadOutlined, EditOutlined } from '@ant-design/icons-vue'
 import { SetJSON, GetFullJSON, SetJSONPath } from '../../../wailsjs/go/service/ValueService'
@@ -17,11 +18,18 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ saved: [] }>()
 
+const { t } = useI18n()
+
 const text = ref(props.value)
 const saving = ref(false)
 const loadingFull = ref(false)
 const truncatedLocal = ref(props.truncated)
 const mode = ref<'text' | 'tree'>('text')
+
+const modeOptions = computed(() => [
+  { value: 'text', label: t('jsonEditor.modeText') },
+  { value: 'tree', label: t('jsonEditor.modeTree') },
+])
 
 function formatNow() {
   const f = tryFormatJson(text.value)
@@ -38,8 +46,8 @@ onMounted(formatNow)
 
 function formatJson() {
   const f = tryFormatJson(text.value)
-  if (f) { text.value = f; message.success('已格式化') }
-  else message.warning('内容不是合法 JSON')
+  if (f) { text.value = f; message.success(t('jsonEditor.formatted')) }
+  else message.warning(t('jsonEditor.invalidJson'))
 }
 
 async function loadFull() {
@@ -48,7 +56,7 @@ async function loadFull() {
     text.value = await GetFullJSON(props.connId, props.db, props.keyName)
     formatNow()
     truncatedLocal.value = false
-    message.success('已加载完整内容')
+    message.success(t('jsonEditor.fullLoaded'))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   } finally {
@@ -61,7 +69,7 @@ async function save() {
   try {
     const ttl = props.ttl > 0 ? props.ttl : -1 // -1 保持原 TTL
     await SetJSON(props.connId, props.db, props.keyName, text.value, ttl)
-    message.success('已保存')
+    message.success(t('jsonEditor.saved'))
     emit('saved')
   } catch (e: any) {
     message.error(String(e?.message ?? e))
@@ -95,8 +103,8 @@ function valueSummary(v: unknown): string {
   if (v === null) return 'null'
   if (typeof v === 'string') return JSON.stringify(v.length > 60 ? v.slice(0, 60) + '…' : v)
   if (typeof v === 'number' || typeof v === 'boolean') return String(v)
-  if (Array.isArray(v)) return `数组 · ${v.length} 项`
-  return `对象 · ${Object.keys(v as object).length} 键`
+  if (Array.isArray(v)) return t('jsonEditor.summaryArray', { n: v.length })
+  return t('jsonEditor.summaryObject', { n: Object.keys(v as object).length })
 }
 
 function buildNode(name: string, v: unknown, path: string): JsonNode {
@@ -164,11 +172,11 @@ function resolvePath(doc: unknown, path: string): unknown {
 
 async function saveNodeEdit() {
   let v = editText.value
-  try { JSON.parse(v) } catch { message.warning('内容不是合法 JSON'); return }
+  try { JSON.parse(v) } catch { message.warning(t('jsonEditor.invalidJson')); return }
   editSaving.value = true
   try {
     await SetJSONPath(props.connId, props.db, props.keyName, editPath.value, v)
-    message.success(`已保存 ${editPath.value}`)
+    message.success(t('jsonEditor.savedPath', { path: editPath.value }))
     editVisible.value = false
     // 整文档回读，保持文本/树一致
     text.value = await GetFullJSON(props.connId, props.db, props.keyName)
@@ -187,24 +195,24 @@ async function saveNodeEdit() {
   <div class="json-editor">
     <div class="je-toolbar">
       <a-tag class="je-tag" color="purple">RedisJSON</a-tag>
-      <a-segmented v-model:value="mode" size="small" :options="[{ value: 'text', label: '文本' }, { value: 'tree', label: '树形' }]" />
+      <a-segmented v-model:value="mode" size="small" :options="modeOptions" />
       <a-button v-if="mode === 'text'" size="small" @click="formatJson">
         <template #icon><FormatPainterOutlined /></template>
-        格式化
+        {{ t('jsonEditor.format') }}
       </a-button>
-      <span class="text-3 je-count">{{ text.length }} 字符</span>
+      <span class="text-3 je-count">{{ t('jsonEditor.chars', { n: text.length }) }}</span>
 
       <template v-if="truncatedLocal">
-        <a-tag class="je-tag" color="warning">已截断（预览 1MB）</a-tag>
+        <a-tag class="je-tag" color="warning">{{ t('jsonEditor.truncatedTag') }}</a-tag>
         <a-button size="small" type="link" :loading="loadingFull" class="load-full-btn" @click="loadFull">
           <template #icon><CloudDownloadOutlined /></template>
-          加载完整值
+          {{ t('jsonEditor.loadFull') }}
         </a-button>
       </template>
 
       <a-button v-if="mode === 'text'" type="primary" size="small" style="margin-left: auto" :loading="saving" @click="save">
         <template #icon><SaveOutlined /></template>
-        保存
+        {{ t('common.save') }}
       </a-button>
     </div>
 
@@ -214,7 +222,7 @@ async function saveNodeEdit() {
 
     <div v-if="mode === 'tree'" class="je-tree-wrap">
       <template v-if="treeData.length">
-        <div v-if="treeOverflow" class="je-tree-warn text-3">文档过大，树形仅展示前 {{ TREE_NODE_LIMIT }} 个节点</div>
+        <div v-if="treeOverflow" class="je-tree-warn text-3">{{ t('jsonEditor.treeOverflow', { n: TREE_NODE_LIMIT }) }}</div>
         <a-tree
           :tree-data="treeData"
           v-model:expanded-keys="expandedKeys"
@@ -233,16 +241,16 @@ async function saveNodeEdit() {
           </template>
         </a-tree>
       </template>
-      <a-empty v-else description="内容不是合法 JSON，请切换到文本模式修正" style="margin-top: 48px" />
+      <a-empty v-else :description="t('jsonEditor.invalidJsonEmpty')" style="margin-top: 48px" />
     </div>
 
     <a-modal
       v-model:open="editVisible"
-      :title="`编辑节点`"
+      :title="t('jsonEditor.editNodeTitle')"
       :width="560"
       :confirm-loading="editSaving"
-      ok-text="保存"
-      cancel-text="取消"
+      :ok-text="t('common.save')"
+      :cancel-text="t('common.cancel')"
       @ok="saveNodeEdit"
     >
       <div class="jt-path mono">{{ editPath }}</div>
@@ -250,7 +258,7 @@ async function saveNodeEdit() {
         <CodeEditor v-model="editText" lang="json" />
       </div>
       <div class="text-3" style="font-size: 11px; margin-top: 6px">
-        通过 JSON.SET 路径级写入，仅更新该节点，文档其余部分与 TTL 不受影响
+        {{ t('jsonEditor.editNodeHint') }}
       </div>
     </a-modal>
   </div>

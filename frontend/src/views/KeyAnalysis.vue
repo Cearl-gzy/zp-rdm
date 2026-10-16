@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, KeyOutlined, PieChartOutlined, DatabaseOutlined, FieldTimeOutlined } from '@ant-design/icons-vue'
 import { AnalyzeKeys } from '../../wailsjs/go/service/KeyService'
@@ -7,6 +8,8 @@ import type { KeyAnalysis } from '../types'
 import { formatBytes, formatTTL, formatNumber } from '../utils/format'
 
 const props = defineProps<{ connId: string; db: number }>()
+
+const { t } = useI18n()
 
 const data = ref<KeyAnalysis | null>(null)
 const loading = ref(false)
@@ -43,7 +46,7 @@ const avgSize = computed(() => {
 <template>
   <div class="analysis">
     <div class="an-toolbar">
-      <a-tooltip title="键名分隔符，用于前缀聚合">
+      <a-tooltip :title="t('analysis.delimiterTip')">
         <a-select v-model:value="delimiter" size="small" style="width: 72px" @change="analyze">
           <a-select-option value=":">:</a-select-option>
           <a-select-option value="/">/</a-select-option>
@@ -54,17 +57,17 @@ const avgSize = computed(() => {
       </a-tooltip>
       <a-button size="small" :loading="loading" @click="analyze">
         <template #icon><ReloadOutlined /></template>
-        重新分析
+        {{ t('analysis.reanalyze') }}
       </a-button>
       <span v-if="data" class="text-3 an-scan-info num">
-        已扫描 {{ formatNumber(data.scanned) }} / {{ formatNumber(data.totalKeys) }} 键
-        <template v-if="data.truncated">（已达 20 万扫描上限）</template>
+        {{ t('analysis.scannedInfo', { scanned: formatNumber(data.scanned), total: formatNumber(data.totalKeys) }) }}
+        <template v-if="data.truncated">{{ t('analysis.scanTruncated') }}</template>
       </span>
     </div>
 
     <div v-if="!data && loading" class="an-loading">
       <a-spin size="large" />
-      <div class="text-3" style="margin-top: 12px; font-size: 12px">正在扫描键空间…</div>
+      <div class="text-3" style="margin-top: 12px; font-size: 12px">{{ t('analysis.scanning') }}</div>
     </div>
 
     <div v-else-if="data" class="an-body">
@@ -73,34 +76,34 @@ const avgSize = computed(() => {
         <div class="an-card">
           <div class="an-card-icon"><KeyOutlined /></div>
           <div class="an-card-num num">{{ formatNumber(data.totalKeys) }}</div>
-          <div class="an-card-label">总键数</div>
+          <div class="an-card-label">{{ t('analysis.totalKeys') }}</div>
         </div>
         <div class="an-card">
           <div class="an-card-icon"><DatabaseOutlined /></div>
           <div class="an-card-num num">{{ formatBytes(data.totalMemory) }}</div>
-          <div class="an-card-label">扫描内存合计</div>
+          <div class="an-card-label">{{ t('analysis.totalMemory') }}</div>
         </div>
         <div class="an-card">
           <div class="an-card-icon"><PieChartOutlined /></div>
           <div class="an-card-num num">{{ formatBytes(avgSize) }}</div>
-          <div class="an-card-label">键均大小</div>
+          <div class="an-card-label">{{ t('analysis.avgSize') }}</div>
         </div>
         <div class="an-card">
           <div class="an-card-icon"><FieldTimeOutlined /></div>
           <div class="an-card-num num">{{ persistentRatio }}%</div>
-          <div class="an-card-label">永久键占比</div>
+          <div class="an-card-label">{{ t('analysis.persistentRatio') }}</div>
         </div>
       </div>
 
       <div class="an-grid">
         <!-- 大 Key 排行 -->
         <div class="an-panel">
-          <div class="an-panel-title">大 Key 排行 <span class="an-panel-sub">TOP {{ data.topKeys.length }} · MEMORY USAGE</span></div>
-          <div v-if="!data.topKeys.length" class="an-empty">暂无数据</div>
+          <div class="an-panel-title">{{ t('analysis.topKeysTitle') }} <span class="an-panel-sub">{{ t('analysis.topKeysSub', { n: data.topKeys.length }) }}</span></div>
+          <div v-if="!data.topKeys.length" class="an-empty">{{ t('common.empty') }}</div>
           <div v-for="k in data.topKeys" :key="k.key" class="top-row">
             <span class="type-badge" :class="`type-${k.type}`">{{ k.type }}</span>
             <span class="top-key mono" :title="k.key">{{ k.key }}</span>
-            <span class="top-ttl num text-3">{{ k.ttl >= 0 ? formatTTL(k.ttl) : '永久' }}</span>
+            <span class="top-ttl num text-3">{{ k.ttl >= 0 ? formatTTL(k.ttl) : t('analysis.persistent') }}</span>
             <div class="top-bar-wrap">
               <div class="top-bar" :style="{ width: `${Math.max(2, (k.size / maxTopSize) * 100)}%` }" />
             </div>
@@ -111,7 +114,7 @@ const avgSize = computed(() => {
         <div class="an-col">
           <!-- TTL 分布 -->
           <div class="an-panel">
-            <div class="an-panel-title">过期时间分布</div>
+            <div class="an-panel-title">{{ t('analysis.ttlDistTitle') }}</div>
             <div v-for="b in data.ttlBuckets" :key="b.label" class="dist-row">
               <span class="dist-label">{{ b.label }}</span>
               <div class="dist-bar-wrap">
@@ -123,15 +126,15 @@ const avgSize = computed(() => {
 
           <!-- 前缀内存 -->
           <div class="an-panel">
-            <div class="an-panel-title">前缀内存占用 <span class="an-panel-sub">TOP 15</span></div>
-            <div v-if="!data.prefixes.length" class="an-empty">暂无数据</div>
+            <div class="an-panel-title">{{ t('analysis.prefixMemTitle') }} <span class="an-panel-sub">TOP 15</span></div>
+            <div v-if="!data.prefixes.length" class="an-empty">{{ t('common.empty') }}</div>
             <div v-for="p in data.prefixes" :key="p.prefix" class="dist-row">
               <span class="dist-label mono prefix" :title="p.prefix">{{ p.prefix }}</span>
               <div class="dist-bar-wrap">
                 <div class="dist-bar mem" :style="{ width: `${Math.max(1.5, (p.size / maxPrefixSize) * 100)}%` }" />
               </div>
               <span class="dist-count num">{{ formatBytes(p.size) }}</span>
-              <span class="dist-sub num text-3">{{ formatNumber(p.count) }} 键</span>
+              <span class="dist-sub num text-3">{{ t('analysis.keysCount', { n: formatNumber(p.count) }) }}</span>
             </div>
           </div>
         </div>

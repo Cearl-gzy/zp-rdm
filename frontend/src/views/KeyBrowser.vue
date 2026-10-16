@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, DeleteOutlined,
@@ -22,6 +23,7 @@ import ValuePanel from './ValuePanel.vue'
 const props = defineProps<{ connId: string; db: number }>()
 const conn = useConnectionStore()
 const app = useAppStore()
+const { t } = useI18n()
 
 // 从工作区会话恢复浏览状态
 const savedWs = app.workspace.conns[props.connId] ?? {}
@@ -86,7 +88,7 @@ const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream', 'ReJSON-RL'
 
 // 新建键可选类型：ReJSON-RL 模块加载时才提供 json（CreateKey 用 'json' 分支）
 const hasJsonModule = computed(() =>
-  (conn.openTabs.find(t => t.id === props.connId)?.state?.modules ?? []).some(m => /rejson/i.test(m)),
+  (conn.openTabs.find(tab => tab.id === props.connId)?.state?.modules ?? []).some(m => /rejson/i.test(m)),
 )
 const createTypes = computed(() =>
   hasJsonModule.value ? ['string', 'hash', 'list', 'set', 'zset', 'stream', 'json'] : keyTypes.slice(0, 6),
@@ -201,11 +203,11 @@ function openCreate() {
 
 async function doCreate() {
   const f = createForm.value
-  if (!f.key) { message.warning('请输入键名'); return }
+  if (!f.key) { message.warning(t('keyBrowser.enterKeyName')); return }
   creating.value = true
   try {
     await CreateKey(props.connId, props.db, f.key, f.type, f.value, f.field, f.score, f.ttl)
-    message.success('创建成功')
+    message.success(t('keyBrowser.created'))
     createVisible.value = false
     refresh()
     selectedKey.value = f.key
@@ -228,17 +230,17 @@ function removeLocal(ks: string[]) {
 async function deleteChecked() {
   // 树勾选会包含目录节点（前缀），只删除真实存在的叶子键
   const targets = checkedLeafKeys()
-  if (!targets.length) { message.warning('未选中有效键'); return }
+  if (!targets.length) { message.warning(t('keyBrowser.noValidSelection')); return }
   Modal.confirm({
-    title: '批量删除',
-    content: `确定删除选中的 ${targets.length} 个键吗？`,
-    okText: '删除',
+    title: t('keyBrowser.batchDeleteTitle'),
+    content: t('keyBrowser.deleteConfirmContent', { n: targets.length }),
+    okText: t('common.delete'),
     okButtonProps: { danger: true },
-    cancelText: '取消',
+    cancelText: t('common.cancel'),
     async onOk() {
       try {
         const n = await DeleteKeys(props.connId, props.db, targets)
-        message.success(`已删除 ${n} 个键`)
+        message.success(t('keyBrowser.deletedN', { n }))
         removeLocal(targets)
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -263,10 +265,10 @@ const moveTargetDb = ref(1)
 const moveRunning = ref(false)
 
 // 当前连接的 db 总数（用于移动目标上限提示）
-const dbCount = computed(() => conn.openTabs.find(t => t.id === props.connId)?.state?.dbCount ?? 16)
+const dbCount = computed(() => conn.openTabs.find(tab => tab.id === props.connId)?.state?.dbCount ?? 16)
 
 function onBatchAction({ key }: { key: string }) {
-  if (!checkedLeafKeys().length) { message.warning('未选中有效键'); return }
+  if (!checkedLeafKeys().length) { message.warning(t('keyBrowser.noValidSelection')); return }
   if (key === 'ttl') { ttlSeconds.value = 3600; ttlVisible.value = true }
   else if (key === 'ttl-clear') clearCheckedTTL()
   else if (key === 'move') { moveTargetDb.value = props.db === 0 ? 1 : 0; moveVisible.value = true }
@@ -277,7 +279,9 @@ async function setCheckedTTL(seconds: number) {
   ttlRunning.value = true
   try {
     const n = await BatchSetTTL(props.connId, props.db, targets, seconds)
-    message.success(seconds < 0 ? `已清除 ${n} 个键的 TTL` : `已为 ${n} 个键设置 TTL ${seconds}s`)
+    message.success(seconds < 0
+      ? t('keyBrowser.ttlClearedN', { n })
+      : t('keyBrowser.ttlSetN', { n, s: seconds }))
     if (seconds < 0) return
     ttlVisible.value = false
   } catch (e: any) {
@@ -289,24 +293,24 @@ async function setCheckedTTL(seconds: number) {
 
 function clearCheckedTTL() {
   Modal.confirm({
-    title: '清除 TTL',
-    content: `确定清除选中键的过期时间（变为永久）吗？`,
-    okText: '清除',
-    cancelText: '取消',
+    title: t('keyBrowser.clearTtlTitle'),
+    content: t('keyBrowser.clearTtlContent'),
+    okText: t('keyBrowser.clearText'),
+    cancelText: t('common.cancel'),
     onOk: () => setCheckedTTL(-1),
   })
 }
 
 async function doMoveChecked() {
   const targets = checkedLeafKeys()
-  if (moveTargetDb.value === props.db) { message.warning('目标 DB 与当前相同'); return }
+  if (moveTargetDb.value === props.db) { message.warning(t('keyBrowser.sameDb')); return }
   moveRunning.value = true
   try {
     const n = await MoveKeys(props.connId, props.db, targets, moveTargetDb.value)
     const skipped = targets.length - n
     message.success(skipped > 0
-      ? `已移动 ${n} 个键到 db${moveTargetDb.value}，${skipped} 个因目标存在同名键被跳过`
-      : `已移动 ${n} 个键到 db${moveTargetDb.value}`)
+      ? t('keyBrowser.movedNSkipped', { n, db: moveTargetDb.value, skipped })
+      : t('keyBrowser.movedN', { n, db: moveTargetDb.value }))
     moveVisible.value = false
     // 移动的键已不在当前 db，先从本地列表移除移动成功的部分无法区分，直接刷新
     refresh()
@@ -329,18 +333,18 @@ const exportFormat = ref<'json' | 'csv'>('json')
 const exporting = ref(false)
 
 function openExport() {
-  if (!checkedLeafKeys().length) { message.warning('请先勾选要导出的键'); return }
+  if (!checkedLeafKeys().length) { message.warning(t('keyBrowser.checkKeysFirst')); return }
   exportVisible.value = true
 }
 
 async function doExportSelected() {
   const targets = checkedLeafKeys()
   try {
-    const path = await PickSaveFile('导出选中键', `keys-${props.connId}-db${props.db}.${exportFormat.value}`)
+    const path = await PickSaveFile(t('keyBrowser.exportSelectedTitle'), `keys-${props.connId}-db${props.db}.${exportFormat.value}`)
     if (!path) return
     exporting.value = true
     const n = await ExportKeys(props.connId, props.db, targets, exportFormat.value, path)
-    message.success(`已导出 ${n} 个键`)
+    message.success(t('keyBrowser.exportedN', { n }))
     exportVisible.value = false
   } catch (e: any) {
     message.error(String(e?.message ?? e))
@@ -358,7 +362,7 @@ const exportDbDone = ref(0)
 async function doExportDatabase() {
   let path = ''
   try {
-    path = await PickSaveFile('导出整库', `dump-${props.connId}-db${props.db}.jsonl`)
+    path = await PickSaveFile(t('keyBrowser.exportDbTitle'), `dump-${props.connId}-db${props.db}.jsonl`)
   } catch { return }
   if (!path) return
   exportDbVisible.value = false
@@ -367,7 +371,7 @@ async function doExportDatabase() {
   EventsOn('export:progress', (n: number) => { exportDbDone.value = n })
   try {
     const n = await ExportDatabase(props.connId, props.db, exportDbPattern.value.trim() || '*', path)
-    message.success(`整库导出完成，共 ${n} 个键`)
+    message.success(t('keyBrowser.exportDbDoneN', { n }))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   } finally {
@@ -381,19 +385,19 @@ const importing = ref(false)
 async function doImport() {
   let path = ''
   try {
-    path = await PickOpenFile('导入键数据')
+    path = await PickOpenFile(t('keyBrowser.importTitle'))
   } catch { return }
   if (!path) return
   Modal.confirm({
-    title: '导入键数据',
-    content: '导入将覆盖同名键（RESTORE REPLACE），确定继续吗？',
-    okText: '导入',
-    cancelText: '取消',
+    title: t('keyBrowser.importTitle'),
+    content: t('keyBrowser.importConfirmContent'),
+    okText: t('keyBrowser.importText'),
+    cancelText: t('common.cancel'),
     async onOk() {
       importing.value = true
       try {
         const n = await ImportKeys(props.connId, props.db, path)
-        message.success(`成功导入 ${n} 个键`)
+        message.success(t('keyBrowser.importedN', { n }))
         refresh()
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -404,12 +408,12 @@ async function doImport() {
   })
 }
 
-const listColumns = [
-  { title: '键名', dataIndex: 'key', key: 'key', ellipsis: true },
-  { title: '类型', dataIndex: 'type', key: 'type', width: 76 },
+const listColumns = computed(() => [
+  { title: t('keyBrowser.keyName'), dataIndex: 'key', key: 'key', ellipsis: true },
+  { title: t('common.type'), dataIndex: 'type', key: 'type', width: 76 },
   { title: 'TTL', dataIndex: 'ttl', key: 'ttl', width: 80 },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 80 },
-]
+  { title: t('keyBrowser.size'), dataIndex: 'size', key: 'size', width: 80 },
+])
 </script>
 
 <template>
@@ -419,7 +423,7 @@ const listColumns = [
         <a-input
           v-model:value="pattern"
           size="small"
-          placeholder="匹配模式，如 user:*"
+          :placeholder="t('keyBrowser.patternPlaceholder')"
           allow-clear
           class="kb-search"
           @press-enter="scan(true)"
@@ -430,18 +434,18 @@ const listColumns = [
           v-model:value="typeFilter"
           size="small"
           allow-clear
-          placeholder="类型"
+          :placeholder="t('common.type')"
           style="width: 86px"
           @change="scan(true)"
         >
-          <a-select-option v-for="t in keyTypes" :key="t" :value="t">{{ t }}</a-select-option>
+          <a-select-option v-for="kt in keyTypes" :key="kt" :value="kt">{{ kt }}</a-select-option>
         </a-select>
-        <a-tooltip title="刷新（F5）">
+        <a-tooltip :title="t('keyBrowser.refreshTooltip')">
           <a-button size="small" :loading="loading" @click="refresh">
             <template #icon><ReloadOutlined /></template>
           </a-button>
         </a-tooltip>
-        <a-tooltip title="新建键">
+        <a-tooltip :title="t('keyBrowser.newKeyTooltip')">
           <a-button size="small" type="primary" @click="openCreate">
             <template #icon><PlusOutlined /></template>
           </a-button>
@@ -453,17 +457,17 @@ const listColumns = [
           <button
             class="vt-btn"
             :class="{ active: viewMode === 'tree' }"
-            title="树形视图"
+            :title="t('keyBrowser.treeView')"
             @click="viewMode = 'tree'"
           ><PartitionOutlined /></button>
           <button
             class="vt-btn"
             :class="{ active: viewMode === 'list' }"
-            title="列表视图"
+            :title="t('keyBrowser.listView')"
             @click="viewMode = 'list'"
           ><UnorderedListOutlined /></button>
         </div>
-        <a-tooltip title="键名分隔符">
+        <a-tooltip :title="t('keyBrowser.delimiterTooltip')">
           <a-select v-model:value="delimiter" size="small" style="width: 64px">
             <a-select-option value=":">:</a-select-option>
             <a-select-option value="/">/</a-select-option>
@@ -479,14 +483,14 @@ const listColumns = [
           <template #overlay>
             <a-menu>
               <a-menu-item key="export-sel" @click="openExport">
-                <DownloadOutlined /> 导出选中键（{{ checkedLeafKeys().length }}）
+                <DownloadOutlined /> {{ t('keyBrowser.exportSelectedMenu', { n: checkedLeafKeys().length }) }}
               </a-menu-item>
               <a-menu-item key="export-db" @click="exportDbVisible = true">
-                <DownloadOutlined /> 导出整库（JSONL）
+                <DownloadOutlined /> {{ t('keyBrowser.exportDbMenu') }}
               </a-menu-item>
               <a-menu-divider />
               <a-menu-item key="import" @click="doImport">
-                <UploadOutlined /> 导入键数据
+                <UploadOutlined /> {{ t('keyBrowser.importMenu') }}
               </a-menu-item>
             </a-menu>
           </template>
@@ -495,26 +499,26 @@ const listColumns = [
           <div v-if="checkedKeys.length" class="batch-bar">
             <a-dropdown trigger="click">
               <a-button size="small">
-                批量操作 {{ checkedKeys.length }} <DownOutlined />
+                {{ t('keyBrowser.batchActions', { n: checkedKeys.length }) }} <DownOutlined />
               </a-button>
               <template #overlay>
                 <a-menu @click="onBatchAction">
-                  <a-menu-item key="ttl">设置 TTL…</a-menu-item>
-                  <a-menu-item key="ttl-clear">清除 TTL</a-menu-item>
-                  <a-menu-item key="move">移动到其他 DB…</a-menu-item>
+                  <a-menu-item key="ttl">{{ t('keyBrowser.setTtlMenu') }}</a-menu-item>
+                  <a-menu-item key="ttl-clear">{{ t('keyBrowser.clearTtlMenu') }}</a-menu-item>
+                  <a-menu-item key="move">{{ t('keyBrowser.moveToDbMenu') }}</a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
             <a-button size="small" danger class="batch-del" @click="deleteChecked">
               <template #icon><DeleteOutlined /></template>
-              删除
+              {{ t('common.delete') }}
             </a-button>
           </div>
         </transition>
       </div>
       <div v-if="exportDbRunning" class="export-progress">
-        <span class="text-2">正在导出整库…</span>
-        <span class="num text-2">{{ exportDbDone }} 键</span>
+        <span class="text-2">{{ t('keyBrowser.exportingDb') }}</span>
+        <span class="num text-2">{{ t('keyBrowser.keysCount', { n: exportDbDone }) }}</span>
       </div>
 
       <div ref="contentRef" class="key-content" :class="{ 'vs-mode': viewMode === 'tree' }">
@@ -561,7 +565,7 @@ const listColumns = [
             showSizeChanger: true,
             pageSizeOptions: ['50', '100', '200', '500'],
             hideOnSinglePage: true,
-            showTotal: (t: number) => `${t} 键`,
+            showTotal: (n: number) => t('keyBrowser.keysCount', { n }),
           }"
           size="small"
           row-key="key"
@@ -587,11 +591,11 @@ const listColumns = [
       </div>
 
       <div class="key-footer">
-        <span class="footer-stat num">{{ keys.length }}<span class="footer-sep">/</span>{{ total }} 键</span>
+        <span class="footer-stat num">{{ keys.length }}<span class="footer-sep">/</span>{{ total }} {{ t('keyBrowser.keysUnit') }}</span>
         <a-button v-if="cursor !== 0" size="small" type="link" :loading="loading" @click="scan(false)">
-          加载更多
+          {{ t('common.loadMore') }}
         </a-button>
-        <span v-else-if="keys.length" class="footer-done">已全部加载</span>
+        <span v-else-if="keys.length" class="footer-done">{{ t('keyBrowser.allLoaded') }}</span>
       </div>
     </div>
 
@@ -608,44 +612,44 @@ const listColumns = [
       <div v-else class="value-empty">
         <div class="empty-inner">
           <DatabaseOutlined class="empty-icon" />
-          <div class="empty-title">从左侧选择一个键查看详情</div>
-          <div class="empty-sub">支持 String / Hash / List / Set / ZSet / Stream</div>
+          <div class="empty-title">{{ t('keyBrowser.emptyTitle') }}</div>
+          <div class="empty-sub">{{ t('keyBrowser.emptySub') }}</div>
         </div>
       </div>
     </div>
 
     <a-modal
       v-model:open="createVisible"
-      title="新建键"
+      :title="t('keyBrowser.createTitle')"
       width="520px"
       :confirm-loading="creating"
-      ok-text="创建"
-      cancel-text="取消"
+      :ok-text="t('common.create')"
+      :cancel-text="t('common.cancel')"
       @ok="doCreate"
     >
       <a-form layout="vertical" size="small">
         <div style="display: flex; gap: 12px">
-          <a-form-item label="键名" required style="flex: 2">
+          <a-form-item :label="t('keyBrowser.keyName')" required style="flex: 2">
             <a-input v-model:value="createForm.key" placeholder="user:1001" class="mono" />
           </a-form-item>
-          <a-form-item label="类型" style="flex: 1">
+          <a-form-item :label="t('common.type')" style="flex: 1">
             <a-select v-model:value="createForm.type">
-              <a-select-option v-for="t in createTypes" :key="t" :value="t">
-                <span class="type-badge" :class="`type-${t}`">{{ t }}</span>
+              <a-select-option v-for="kt in createTypes" :key="kt" :value="kt">
+                <span class="type-badge" :class="`type-${kt}`">{{ kt }}</span>
               </a-select-option>
             </a-select>
           </a-form-item>
         </div>
-        <a-form-item v-if="['hash', 'stream'].includes(createForm.type)" label="字段名">
+        <a-form-item v-if="['hash', 'stream'].includes(createForm.type)" :label="t('keyBrowser.fieldName')">
           <a-input v-model:value="createForm.field" placeholder="field" class="mono" />
         </a-form-item>
-        <a-form-item :label="createForm.type === 'zset' ? '成员' : createForm.type === 'string' ? '值' : createForm.type === 'json' ? 'JSON 文档' : '初始值'">
+        <a-form-item :label="createForm.type === 'zset' ? t('keyBrowser.member') : createForm.type === 'string' ? t('common.value') : createForm.type === 'json' ? t('keyBrowser.jsonDoc') : t('keyBrowser.initialValue')">
           <a-textarea v-model:value="createForm.value" :rows="3" class="mono" :placeholder="createForm.type === 'json' ? jsonExample : ''" />
         </a-form-item>
-        <a-form-item v-if="createForm.type === 'zset'" label="分数">
+        <a-form-item v-if="createForm.type === 'zset'" :label="t('keyBrowser.scoreLabel')">
           <a-input-number v-model:value="createForm.score" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="TTL（秒，0 = 永久）">
+        <a-form-item :label="t('keyBrowser.ttlLabel')">
           <a-input-number v-model:value="createForm.ttl" :min="0" style="width: 100%" />
         </a-form-item>
       </a-form>
@@ -654,22 +658,22 @@ const listColumns = [
     <!-- 导出选中键 -->
     <a-modal
       v-model:open="exportVisible"
-      title="导出选中键"
+      :title="t('keyBrowser.exportSelectedTitle')"
       width="420px"
       :confirm-loading="exporting"
-      ok-text="导出"
-      cancel-text="取消"
+      :ok-text="t('keyBrowser.exportText')"
+      :cancel-text="t('common.cancel')"
       @ok="doExportSelected"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item :label="`格式（共 ${checkedLeafKeys().length} 个键）`">
+        <a-form-item :label="t('keyBrowser.exportFormatLabel', { n: checkedLeafKeys().length })">
           <a-radio-group v-model:value="exportFormat">
-            <a-radio-button value="json">JSON（可再导入）</a-radio-button>
-            <a-radio-button value="csv">CSV（表格查看）</a-radio-button>
+            <a-radio-button value="json">{{ t('keyBrowser.exportJsonOption') }}</a-radio-button>
+            <a-radio-button value="csv">{{ t('keyBrowser.exportCsvOption') }}</a-radio-button>
           </a-radio-group>
         </a-form-item>
         <div class="text-3" style="font-size: 11px; line-height: 1.6">
-          JSON 格式使用 DUMP 序列化，全类型无损、支持二进制，可通过「导入键数据」恢复到任意实例。
+          {{ t('keyBrowser.exportJsonHint') }}
         </div>
       </a-form>
     </a-modal>
@@ -677,18 +681,18 @@ const listColumns = [
     <!-- 导出整库 -->
     <a-modal
       v-model:open="exportDbVisible"
-      title="导出整库"
+      :title="t('keyBrowser.exportDbTitle')"
       width="420px"
-      ok-text="开始导出"
-      cancel-text="取消"
+      :ok-text="t('keyBrowser.startExport')"
+      :cancel-text="t('common.cancel')"
       @ok="doExportDatabase"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item label="匹配模式（留空导出全部）">
-          <a-input v-model:value="exportDbPattern" placeholder="如 user:*" class="mono" @press-enter="doExportDatabase" />
+        <a-form-item :label="t('keyBrowser.exportPatternLabel')">
+          <a-input v-model:value="exportDbPattern" :placeholder="t('keyBrowser.patternExample')" class="mono" @press-enter="doExportDatabase" />
         </a-form-item>
         <div class="text-3" style="font-size: 11px; line-height: 1.6">
-          以 JSONL 格式流式导出（每行一个键，含 DUMP + TTL），大库导出期间界面可操作。
+          {{ t('keyBrowser.exportDbHint') }}
         </div>
       </a-form>
     </a-modal>
@@ -696,19 +700,19 @@ const listColumns = [
     <!-- 批量设置 TTL -->
     <a-modal
       v-model:open="ttlVisible"
-      title="批量设置 TTL"
+      :title="t('keyBrowser.batchTtlTitle')"
       width="420px"
-      ok-text="设置"
-      cancel-text="取消"
+      :ok-text="t('keyBrowser.setText')"
+      :cancel-text="t('common.cancel')"
       :confirm-loading="ttlRunning"
       @ok="setCheckedTTL(ttlSeconds)"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item :label="`过期时间（秒），将应用于 ${checkedLeafKeys().length} 个键`">
+        <a-form-item :label="t('keyBrowser.ttlApplyLabel', { n: checkedLeafKeys().length })">
           <a-input-number v-model:value="ttlSeconds" :min="1" style="width: 100%" />
         </a-form-item>
         <div class="text-3" style="font-size: 11px">
-          常用：300（5 分钟）· 3600（1 小时）· 86400（1 天）· 604800（7 天）
+          {{ t('keyBrowser.ttlPresets') }}
         </div>
       </a-form>
     </a-modal>
@@ -716,19 +720,19 @@ const listColumns = [
     <!-- 批量移动到其他 DB -->
     <a-modal
       v-model:open="moveVisible"
-      title="批量移动到 DB"
+      :title="t('keyBrowser.batchMoveTitle')"
       width="420px"
-      ok-text="移动"
-      cancel-text="取消"
+      :ok-text="t('keyBrowser.moveText')"
+      :cancel-text="t('common.cancel')"
       :confirm-loading="moveRunning"
       @ok="doMoveChecked"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item :label="`目标 DB（当前 db${db}，共 ${dbCount} 个）`">
+        <a-form-item :label="t('keyBrowser.moveTargetLabel', { db, count: dbCount })">
           <a-input-number v-model:value="moveTargetDb" :min="0" :max="dbCount - 1" style="width: 100%" />
         </a-form-item>
         <div class="text-3" style="font-size: 11px; line-height: 1.6">
-          使用 MOVE 语义：目标 DB 已存在同名键时该键会被跳过（不覆盖）。
+          {{ t('keyBrowser.moveHint') }}
         </div>
       </a-form>
     </a-modal>

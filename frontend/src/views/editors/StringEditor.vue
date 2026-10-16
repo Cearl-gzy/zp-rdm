@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { SaveOutlined, FormatPainterOutlined, CloudDownloadOutlined, WarningOutlined } from '@ant-design/icons-vue'
 import { SetString, SetStringHex, GetFullString, GetStringHex } from '../../../wailsjs/go/service/ValueService'
@@ -16,6 +17,8 @@ const props = defineProps<{
   binary: boolean
 }>()
 const emit = defineEmits<{ saved: [] }>()
+
+const { t } = useI18n()
 
 const text = ref(props.value)
 // 二进制值默认 Hex 视图
@@ -85,14 +88,14 @@ function onModeChange() {
   } else if (viewMode.value === 'json') {
     const f = tryFormatJson(text.value)
     if (f) text.value = f
-    else message.warning('内容不是合法 JSON')
+    else message.warning(t('editors.invalidJson'))
   }
 }
 
 function formatJson() {
   const f = tryFormatJson(text.value)
-  if (f) { text.value = f; message.success('已格式化') }
-  else message.warning('内容不是合法 JSON')
+  if (f) { text.value = f; message.success(t('editors.formatted')) }
+  else message.warning(t('editors.invalidJson'))
 }
 
 // ---------- 加载完整值 ----------
@@ -107,7 +110,7 @@ async function loadFull() {
       if (viewMode.value === 'hex') hexEdit.value = textToHexStream(text.value)
     }
     truncatedLocal.value = false
-    message.success('已加载完整内容')
+    message.success(t('editors.loadedFull'))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   } finally {
@@ -125,7 +128,7 @@ async function save() {
     } else {
       await SetString(props.connId, props.db, props.keyName, text.value, ttl)
     }
-    message.success('已保存')
+    message.success(t('editors.saved'))
     emit('saved')
   } catch (e: any) {
     message.error(String(e?.message ?? e))
@@ -139,35 +142,35 @@ async function save() {
   <div class="string-editor">
     <div class="se-toolbar">
       <a-radio-group v-model:value="viewMode" size="small" option-type="button" button-style="solid" @change="onModeChange">
-        <a-radio-button value="text">文本</a-radio-button>
+        <a-radio-button value="text">{{ t('editors.text') }}</a-radio-button>
         <a-radio-button value="json">JSON</a-radio-button>
         <a-radio-button value="hex">Hex</a-radio-button>
       </a-radio-group>
       <a-button v-if="viewMode === 'json'" size="small" @click="formatJson">
         <template #icon><FormatPainterOutlined /></template>
-        格式化
+        {{ t('editors.format') }}
       </a-button>
-      <span class="text-3 se-count">{{ viewMode === 'hex' ? `${hexEdit.replace(/\s/g, '').length / 2} 字节` : `${text.length} 字符` }}</span>
+      <span class="text-3 se-count">{{ viewMode === 'hex' ? t('editors.bytesCount', { n: hexEdit.replace(/\s/g, '').length / 2 }) : t('editors.charsCount', { n: text.length }) }}</span>
 
       <a-tag v-if="binary" class="se-tag binary-tag">
-        <WarningOutlined /> 二进制内容
+        <WarningOutlined /> {{ t('editors.binaryContent') }}
       </a-tag>
       <template v-if="truncatedLocal">
-        <a-tag class="se-tag" color="warning">已截断（预览 1MB）</a-tag>
+        <a-tag class="se-tag" color="warning">{{ t('editors.truncatedTag') }}</a-tag>
         <a-button size="small" type="link" :loading="loadingFull" class="load-full-btn" @click="loadFull">
           <template #icon><CloudDownloadOutlined /></template>
-          加载完整值
+          {{ t('editors.loadFull') }}
         </a-button>
       </template>
 
       <a-button type="primary" size="small" style="margin-left: auto" :loading="saving" @click="save">
         <template #icon><SaveOutlined /></template>
-        保存
+        {{ t('common.save') }}
       </a-button>
     </div>
 
     <div v-if="binary && viewMode !== 'hex'" class="binary-hint">
-      该值包含二进制数据，文本模式显示可能出现乱码，建议使用 Hex 模式编辑
+      {{ t('editors.binaryHint') }}
     </div>
 
     <div v-if="viewMode === 'hex'" class="se-hex-wrap">
@@ -177,7 +180,7 @@ async function save() {
           class="se-hex mono"
           :class="{ 'is-binary': binary }"
           spellcheck="false"
-          placeholder="十六进制，如 48 65 6c 6c 6f"
+          :placeholder="t('editors.hexPlaceholder')"
         />
       </a-spin>
     </div>

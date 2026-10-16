@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import {
   ReloadOutlined, EditOutlined, CopyOutlined, DeleteOutlined, ClockCircleOutlined,
@@ -23,6 +24,8 @@ const emit = defineEmits<{
   deleted: [key: string]
   renamed: [oldKey: string, newKey: string]
 }>()
+
+const { t } = useI18n()
 
 const detail = ref<ValueDetail | null>(null)
 const loading = ref(false)
@@ -62,7 +65,7 @@ async function doRename() {
   }
   try {
     await RenameKey(props.connId, props.db, props.keyName, renameValue.value)
-    message.success('重命名成功')
+    message.success(t('value.renamed'))
     emit('renamed', props.keyName, renameValue.value)
     renameVisible.value = false
   } catch (e: any) {
@@ -80,7 +83,7 @@ function openTTL() {
 async function doSetTTL() {
   try {
     await SetTTL(props.connId, props.db, props.keyName, ttlValue.value)
-    message.success('TTL 已更新')
+    message.success(t('value.ttlUpdated'))
     ttlVisible.value = false
     load()
   } catch (e: any) {
@@ -125,10 +128,10 @@ async function doCopy() {
         props.keyName, copyValue.value, copyReplace.value,
       )
     }
-    message.success(`已复制到 ${copyValue.value}`)
+    message.success(t('value.copiedTo', { key: copyValue.value }))
     copyVisible.value = false
   } catch (e: any) {
-    message.error(String(e?.message ?? e) || '复制失败')
+    message.error(String(e?.message ?? e) || t('value.copyFailed'))
   } finally {
     copying.value = false
   }
@@ -137,15 +140,15 @@ async function doCopy() {
 // ---------- 删除 ----------
 function doDelete() {
   Modal.confirm({
-    title: '删除键',
-    content: `确定删除「${props.keyName}」吗？`,
-    okText: '删除',
+    title: t('value.deleteTitle'),
+    content: t('value.deleteContent', { key: props.keyName }),
+    okText: t('common.delete'),
     okButtonProps: { danger: true },
-    cancelText: '取消',
+    cancelText: t('common.cancel'),
     async onOk() {
       try {
         await DeleteKeys(props.connId, props.db, [props.keyName])
-        message.success('已删除')
+        message.success(t('value.deleted'))
         emit('deleted', props.keyName)
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -156,7 +159,7 @@ function doDelete() {
 
 function copyName() {
   navigator.clipboard?.writeText(props.keyName)
-  message.success('键名已复制')
+  message.success(t('value.nameCopied'))
 }
 </script>
 
@@ -168,21 +171,21 @@ function copyName() {
       </div>
       <div class="vp-meta-row" v-if="detail">
         <span class="type-badge" :class="`type-${detail.type}`">{{ detail.type }}</span>
-        <span class="meta-chip static num" :title="`内部编码: ${detail.encoding || '-'}`">{{ detail.encoding || '-' }}</span>
-        <a-tooltip title="点击修改 TTL">
+        <span class="meta-chip static num" :title="t('value.encodingTip', { enc: detail.encoding || '-' })">{{ detail.encoding || '-' }}</span>
+        <a-tooltip :title="t('value.ttlTip')">
           <span class="meta-chip clickable" :class="{ warn: detail.ttl > 0 && detail.ttl < 300 }" @click="openTTL">
             <ClockCircleOutlined />
             <span class="num">{{ formatTTL(detail.ttl) }}</span>
           </span>
         </a-tooltip>
         <span class="meta-chip static num">{{ formatBytes(detail.size) }}</span>
-        <span v-if="detail.type !== 'string'" class="meta-chip static num">{{ detail.length }} 项</span>
+        <span v-if="detail.type !== 'string'" class="meta-chip static num">{{ t('value.items', { n: detail.length }) }}</span>
         <div class="vp-actions">
-          <a-tooltip title="刷新"><button class="vp-icon-btn" @click="load"><ReloadOutlined :spin="loading" /></button></a-tooltip>
-          <a-tooltip title="重命名"><button class="vp-icon-btn" @click="openRename"><EditOutlined /></button></a-tooltip>
-          <a-tooltip title="复制键"><button class="vp-icon-btn" @click="openCopy"><CopyOutlined /></button></a-tooltip>
+          <a-tooltip :title="t('common.refresh')"><button class="vp-icon-btn" @click="load"><ReloadOutlined :spin="loading" /></button></a-tooltip>
+          <a-tooltip :title="t('value.rename')"><button class="vp-icon-btn" @click="openRename"><EditOutlined /></button></a-tooltip>
+          <a-tooltip :title="t('value.copyKey')"><button class="vp-icon-btn" @click="openCopy"><CopyOutlined /></button></a-tooltip>
           <span class="vp-actions-divider" />
-          <a-tooltip title="删除"><button class="vp-icon-btn danger" @click="doDelete"><DeleteOutlined /></button></a-tooltip>
+          <a-tooltip :title="t('common.delete')"><button class="vp-icon-btn danger" @click="doDelete"><DeleteOutlined /></button></a-tooltip>
         </div>
       </div>
     </div>
@@ -190,7 +193,7 @@ function copyName() {
     <div class="vp-body">
       <a-spin :spinning="loading" style="height: 100%">
         <div v-if="missing" class="missing">
-          <a-empty description="键不存在或已过期" />
+          <a-empty :description="t('value.missing')" />
         </div>
         <template v-else-if="detail">
           <StringEditor
@@ -211,35 +214,35 @@ function copyName() {
           <SetEditor v-else-if="detail.type === 'set'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
           <ZSetEditor v-else-if="detail.type === 'zset'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
           <StreamEditor v-else-if="detail.type === 'stream'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
-          <a-empty v-else :description="`暂不支持 ${detail.type} 类型`" style="margin-top: 80px" />
+          <a-empty v-else :description="t('value.unsupportedType', { type: detail.type })" style="margin-top: 80px" />
         </template>
       </a-spin>
     </div>
 
-    <a-modal v-model:open="renameVisible" title="重命名键" width="440px" ok-text="确定" cancel-text="取消" @ok="doRename">
+    <a-modal v-model:open="renameVisible" :title="t('value.renameTitle')" width="440px" :ok-text="t('common.confirm')" :cancel-text="t('common.cancel')" @ok="doRename">
       <a-input v-model:value="renameValue" class="mono" @press-enter="doRename" />
     </a-modal>
 
-    <a-modal v-model:open="ttlVisible" title="设置 TTL" width="400px" ok-text="确定" cancel-text="取消" @ok="doSetTTL">
-      <a-input-number v-model:value="ttlValue" :min="-1" style="width: 100%" addon-after="秒" />
-      <div class="text-3" style="font-size: 11px; margin-top: 6px">-1 表示永久（移除过期时间）</div>
+    <a-modal v-model:open="ttlVisible" :title="t('value.ttlTitle')" width="400px" :ok-text="t('common.confirm')" :cancel-text="t('common.cancel')" @ok="doSetTTL">
+      <a-input-number v-model:value="ttlValue" :min="-1" style="width: 100%" :addon-after="t('value.seconds')" />
+      <div class="text-3" style="font-size: 11px; margin-top: 6px">{{ t('value.ttlHint') }}</div>
     </a-modal>
 
-    <a-modal v-model:open="copyVisible" title="复制键" width="440px" ok-text="复制" cancel-text="取消" :confirm-loading="copying" @ok="doCopy">
+    <a-modal v-model:open="copyVisible" :title="t('value.copyTitle')" width="440px" :ok-text="t('common.copy')" :cancel-text="t('common.cancel')" :confirm-loading="copying" @ok="doCopy">
       <a-form layout="vertical" size="small">
-        <a-form-item label="新键名">
-          <a-input v-model:value="copyValue" class="mono" placeholder="新键名" @press-enter="doCopy" />
+        <a-form-item :label="t('value.newKeyName')">
+          <a-input v-model:value="copyValue" class="mono" :placeholder="t('value.newKeyName')" @press-enter="doCopy" />
         </a-form-item>
         <div style="display: flex; gap: 12px">
-          <a-form-item label="目标连接" style="flex: 2">
+          <a-form-item :label="t('value.targetConn')" style="flex: 2">
             <a-select v-model:value="copyTargetConn" :options="copyTargetOptions" />
           </a-form-item>
-          <a-form-item label="目标 DB" style="flex: 1">
+          <a-form-item :label="t('value.targetDb')" style="flex: 1">
             <a-input-number v-model:value="copyTargetDb" :min="0" :max="targetDbCount - 1" style="width: 100%" />
           </a-form-item>
         </div>
         <a-checkbox v-if="copyTargetConn !== connId || copyTargetDb !== db" v-model:checked="copyReplace">
-          覆盖同名键（RESTORE REPLACE）
+          {{ t('value.overwriteHint') }}
         </a-checkbox>
       </a-form>
     </a-modal>

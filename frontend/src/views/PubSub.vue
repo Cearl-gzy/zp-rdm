@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined, SendOutlined, ClearOutlined } from '@ant-design/icons-vue'
 import { Subscribe, Unsubscribe, UnsubscribeAll, Publish, PubSubChannels } from '../../wailsjs/go/service/ServerService'
@@ -7,6 +8,8 @@ import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import type { PubSubMessage } from '../types'
 
 const props = defineProps<{ connId: string; db: number }>()
+
+const { t } = useI18n()
 
 const eventName = computed(() => `pubsub:${props.connId}:${props.db}`)
 
@@ -28,7 +31,7 @@ async function subscribe() {
     await Subscribe(props.connId, props.db, ch, isPattern.value)
     subscribed.value.push({ channel: ch, pattern: isPattern.value })
     channel.value = ''
-    message.success('订阅成功')
+    message.success(t('pubsub.subscribed'))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   }
@@ -44,10 +47,10 @@ async function unsubscribe(ch: string) {
 }
 
 async function publish() {
-  if (!pubChannel.value) { message.warning('请输入频道'); return }
+  if (!pubChannel.value) { message.warning(t('pubsub.channelRequired')); return }
   try {
     const n = await Publish(props.connId, props.db, pubChannel.value, pubMessage.value)
-    message.success(`已推送给 ${n} 个订阅者`)
+    message.success(t('pubsub.publishedTo', { n }))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   }
@@ -85,16 +88,16 @@ function fmtMsgTime(ms: number): string {
   <div class="pubsub">
     <div class="ps-left">
       <div class="ps-section">
-        <div class="ps-title">订阅频道</div>
+        <div class="ps-title">{{ t('pubsub.subscribeChannels') }}</div>
         <div class="sub-form">
-          <a-input v-model:value="channel" size="small" placeholder="频道名，支持 * 模式" class="mono" @press-enter="subscribe" />
-          <a-checkbox v-model:checked="isPattern">模式</a-checkbox>
+          <a-input v-model:value="channel" size="small" :placeholder="t('pubsub.channelPlaceholder')" class="mono" @press-enter="subscribe" />
+          <a-checkbox v-model:checked="isPattern">{{ t('pubsub.pattern') }}</a-checkbox>
           <a-button size="small" type="primary" @click="subscribe">
             <template #icon><PlusOutlined /></template>
           </a-button>
         </div>
         <div class="sub-list">
-          <a-empty v-if="!subscribed.length" description="暂无订阅" :image-style="{ height: '36px' }" />
+          <a-empty v-if="!subscribed.length" :description="t('pubsub.noSubscriptions')" :image-style="{ height: '36px' }" />
           <div v-for="s in subscribed" :key="s.channel" class="sub-item">
             <a-tag v-if="s.pattern" color="purple">P</a-tag>
             <span class="mono sub-ch">{{ s.channel }}</span>
@@ -107,8 +110,8 @@ function fmtMsgTime(ms: number): string {
 
       <div class="ps-section">
         <div class="ps-title">
-          发布消息
-          <a-button size="small" type="link" style="margin-left: auto" @click="loadActive">活跃频道</a-button>
+          {{ t('pubsub.publishMessage') }}
+          <a-button size="small" type="link" style="margin-left: auto" @click="loadActive">{{ t('pubsub.activeChannels') }}</a-button>
         </div>
         <div class="active-channels" v-if="activeChannels.length">
           <a-tag
@@ -118,25 +121,25 @@ function fmtMsgTime(ms: number): string {
             @click="pubChannel = c"
           >{{ c }}</a-tag>
         </div>
-        <a-input v-model:value="pubChannel" size="small" placeholder="频道" class="mono" style="margin-bottom: 8px" />
-        <a-textarea v-model:value="pubMessage" :rows="4" placeholder="消息内容" class="mono" />
+        <a-input v-model:value="pubChannel" size="small" :placeholder="t('pubsub.publishChannelPlaceholder')" class="mono" style="margin-bottom: 8px" />
+        <a-textarea v-model:value="pubMessage" :rows="4" :placeholder="t('pubsub.messagePlaceholder')" class="mono" />
         <a-button size="small" type="primary" block style="margin-top: 8px" @click="publish">
           <template #icon><SendOutlined /></template>
-          发布
+          {{ t('pubsub.publish') }}
         </a-button>
       </div>
     </div>
 
     <div class="ps-right">
       <div class="ps-title">
-        消息记录（{{ messages.length }}）
+        {{ t('pubsub.messageLog', { n: messages.length }) }}
         <a-button size="small" type="text" style="margin-left: auto" @click="messages = []">
           <template #icon><ClearOutlined /></template>
-          清空
+          {{ t('pubsub.clear') }}
         </a-button>
       </div>
       <div ref="logRef" class="msg-log">
-        <a-empty v-if="!messages.length" description="订阅后等待消息…" style="margin-top: 80px" />
+        <a-empty v-if="!messages.length" :description="t('pubsub.waitingForMessages')" style="margin-top: 80px" />
         <div v-for="(m, i) in messages" :key="i" class="msg-item term-line">
           <div class="msg-head">
             <span class="msg-time mono">{{ fmtMsgTime(m.time) }}</span>

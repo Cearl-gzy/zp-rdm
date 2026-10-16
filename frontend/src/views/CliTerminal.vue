@@ -12,9 +12,11 @@ import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
 import { REDIS_COMMANDS, REDIS_SUBCOMMANDS } from '../utils/redisCommands'
 import type { CliResult } from '../types'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{ connId: string; db: number }>()
 const app = useAppStore()
+const { t } = useI18n()
 
 interface Entry {
   id: number
@@ -125,12 +127,12 @@ function fmtTime(): string {
 // ---------- 危险命令护栏 ----------
 function dangerOf(cmd: string): string | null {
   const c = cmd.trim()
-  if (/^flushall\b/i.test(c)) return 'FLUSHALL 将清空整个实例的全部数据'
-  if (/^flushdb\b/i.test(c)) return 'FLUSHDB 将清空当前数据库的全部数据'
-  if (/^shutdown\b/i.test(c)) return 'SHUTDOWN 将关闭 Redis 服务器'
-  if (/^debug\b/i.test(c)) return 'DEBUG 命令可能导致服务器崩溃或长时间阻塞'
-  if (/^config\s+(set|resetstat|rewrite)\b/i.test(c)) return '该命令会修改服务器运行配置'
-  if (/^keys\b/i.test(c)) return 'KEYS 会全量扫描键空间，生产环境可能长时间阻塞'
+  if (/^flushall\b/i.test(c)) return t('cli.danger.flushall')
+  if (/^flushdb\b/i.test(c)) return t('cli.danger.flushdb')
+  if (/^shutdown\b/i.test(c)) return t('cli.danger.shutdown')
+  if (/^debug\b/i.test(c)) return t('cli.danger.debug')
+  if (/^config\s+(set|resetstat|rewrite)\b/i.test(c)) return t('cli.danger.config')
+  if (/^keys\b/i.test(c)) return t('cli.danger.keys')
   return null
 }
 
@@ -140,11 +142,11 @@ function exec() {
   const danger = dangerOf(cmd)
   if (danger) {
     Modal.confirm({
-      title: '危险命令确认',
-      content: `${danger}。确定执行「${cmd}」吗？`,
-      okText: '仍要执行',
+      title: t('cli.danger.title'),
+      content: t('cli.danger.content', { reason: danger, cmd }),
+      okText: t('cli.danger.confirm'),
       okButtonProps: { danger: true },
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: () => doExec(cmd),
     })
     return
@@ -305,13 +307,13 @@ onMounted(() => inputRef.value?.focus())
   <div class="cli" @click="mode === 'cmd' && inputRef?.focus()">
     <div class="cli-toolbar">
       <a-segmented v-model:value="mode" size="small"
-        :options="[{ value: 'cmd', label: '命令' }, { value: 'monitor', label: 'MONITOR' }]" />
+        :options="[{ value: 'cmd', label: t('cli.modeCmd') }, { value: 'monitor', label: 'MONITOR' }]" />
       <span v-if="mode === 'cmd'" class="text-3" style="font-size: 11px">
-        支持任意 Redis 命令，↑↓ 翻历史，Tab 补全命令/键名，危险命令需确认
+        {{ t('cli.cmdHint') }}
       </span>
       <div class="toolbar-actions">
         <template v-if="mode === 'monitor' && monOn">
-          <a-tooltip :title="monPaused ? '继续' : '暂停'">
+          <a-tooltip :title="monPaused ? t('cli.resume') : t('cli.pause')">
             <a-button size="small" type="text" @click.stop="monPaused = !monPaused">
               <template #icon><PauseOutlined v-if="!monPaused" /><CaretRightOutlined v-else /></template>
             </a-button>
@@ -322,7 +324,7 @@ onMounted(() => inputRef.value?.focus())
         </template>
         <a-button v-if="mode === 'cmd'" size="small" type="text" @click.stop="entries = []">
           <template #icon><ClearOutlined /></template>
-          清屏
+          {{ t('cli.clear') }}
         </a-button>
       </div>
     </div>
@@ -331,7 +333,7 @@ onMounted(() => inputRef.value?.focus())
     <template v-if="mode === 'cmd'">
       <div ref="outputRef" class="cli-output" @click.stop>
         <div class="cli-welcome mono">
-          ZP Redis CLI · 已连接 db{{ db }} · 输入命令开始，例如 INFO server
+          {{ t('cli.welcome', { db }) }}
         </div>
         <div v-for="e in entries" :key="e.id" class="cli-entry term-line">
           <div class="cli-cmd mono">
@@ -352,7 +354,7 @@ onMounted(() => inputRef.value?.focus())
             @mousedown.prevent="applyCand(i)"
             @mouseenter="candIdx = i"
           >{{ c }}</div>
-          <div class="cand-hint">↑↓ 选择 · Tab/Enter 确认 · Esc 关闭</div>
+          <div class="cand-hint">{{ t('cli.candHint') }}</div>
         </div>
         <div class="cli-input-row">
           <span class="prompt mono">db{{ db }}&gt;</span>
@@ -360,7 +362,7 @@ onMounted(() => inputRef.value?.focus())
             ref="inputRef"
             v-model="input"
             class="cli-input mono"
-            placeholder="输入 Redis 命令…"
+            :placeholder="t('cli.inputPlaceholder')"
             spellcheck="false"
             @keydown="onKeydown"
             @keyup.enter="onEnterKeyup"
@@ -375,31 +377,31 @@ onMounted(() => inputRef.value?.focus())
     <!-- MONITOR 模式 -->
     <template v-else>
       <div class="mon-filter-row">
-        <span class="mon-status" :class="{ on: monOn }">{{ monOn ? '监听中' : '未启动' }}</span>
+        <span class="mon-status" :class="{ on: monOn }">{{ monOn ? t('cli.monOn') : t('cli.monOff') }}</span>
         <input
           v-model="monFilter"
           class="mon-filter mono"
-          placeholder="过滤（如 GET、db0、IP）…"
+          :placeholder="t('cli.filterPlaceholder')"
           spellcheck="false"
           @click.stop
         />
-        <span class="text-3" style="font-size: 11px">{{ filteredMonLines.length }} / {{ monLines.length }} 条</span>
+        <span class="text-3" style="font-size: 11px">{{ t('cli.monCount', { filtered: filteredMonLines.length, total: monLines.length }) }}</span>
       </div>
       <div ref="monOutputRef" class="cli-output mon-output" @click.stop>
         <div v-if="!monLines.length" class="cli-welcome mono">
-          MONITOR 实时显示服务器执行的每条命令。注意：生产环境开启会有性能损耗。
+          {{ t('cli.monWelcome') }}
         </div>
         <div v-for="(l, i) in filteredMonLines" :key="i" class="mon-line mono">{{ l }}</div>
-        <div v-if="monPaused && monLines.length" class="mon-paused mono">已暂停（新命令仍在后台丢弃，点击继续恢复）</div>
+        <div v-if="monPaused && monLines.length" class="mon-paused mono">{{ t('cli.monPaused') }}</div>
       </div>
       <div class="mon-footer">
         <a-button v-if="!monOn" size="small" type="primary" @click="startMonitor">
           <template #icon><PlayCircleOutlined /></template>
-          开始监听
+          {{ t('cli.monStart') }}
         </a-button>
         <a-button v-else size="small" danger @click="stopMonitor">
           <template #icon><StopOutlined /></template>
-          停止监听
+          {{ t('cli.monStop') }}
         </a-button>
       </div>
     </template>

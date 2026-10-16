@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import { ListGet, ListSet, ListPush, ListRemoveIndex } from '../../../wailsjs/go/service/ValueService'
 import type { ListItem, ScanItems } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
+
+const { t } = useI18n()
 
 const items = ref<ListItem[]>([])
 const total = ref(props.total)
@@ -60,7 +63,7 @@ async function save() {
     } else {
       await ListSet(props.connId, props.db, props.keyName, editIndex.value, editValue.value)
     }
-    message.success('已保存')
+    message.success(t('editors.saved'))
     editVisible.value = false
     load()
   } catch (e: any) {
@@ -72,13 +75,13 @@ async function save() {
 
 function remove(item: ListItem) {
   Modal.confirm({
-    title: '删除元素',
-    content: `确定删除索引 ${item.index} 的元素吗？`,
-    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('editors.deleteElement'),
+    content: t('editors.deleteElementContent', { index: item.index }),
+    okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         await ListRemoveIndex(props.connId, props.db, props.keyName, item.index)
-        message.success('已删除')
+        message.success(t('editors.deleted'))
         load()
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -87,11 +90,11 @@ function remove(item: ListItem) {
   })
 }
 
-const columns = [
-  { title: '索引', dataIndex: 'index', key: 'index', width: 90 },
-  { title: '值', dataIndex: 'value', key: 'value' },
-  { title: '操作', key: 'ops', width: 90 },
-]
+const columns = computed(() => [
+  { title: t('editors.index'), dataIndex: 'index', key: 'index', width: 90 },
+  { title: t('common.value'), dataIndex: 'value', key: 'value' },
+  { title: t('common.actions'), key: 'ops', width: 90 },
+])
 </script>
 
 <template>
@@ -102,9 +105,9 @@ const columns = [
       </a-button>
       <a-button size="small" type="primary" @click="openAdd">
         <template #icon><PlusOutlined /></template>
-        添加元素
+        {{ t('editors.addElement') }}
       </a-button>
-      <span class="text-3" style="font-size: 11px; margin-left: auto">共 {{ total }} 项</span>
+      <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('editors.totalItems', { n: total }) }}</span>
     </div>
 
     <div class="ce-table">
@@ -147,20 +150,20 @@ const columns = [
 
     <a-modal
       v-model:open="editVisible"
-      :title="editMode === 'add' ? '添加元素' : `编辑索引 ${editIndex}`"
+      :title="editMode === 'add' ? t('editors.addElement') : t('editors.editIndexTitle', { index: editIndex })"
       width="480px"
       :confirm-loading="saving"
-      ok-text="保存" cancel-text="取消"
+      :ok-text="t('common.save')" :cancel-text="t('common.cancel')"
       @ok="save"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item v-if="editMode === 'add'" label="推入方向">
+        <a-form-item v-if="editMode === 'add'" :label="t('editors.pushSide')">
           <a-radio-group v-model:value="pushSide">
-            <a-radio-button value="left">左侧 LPUSH</a-radio-button>
-            <a-radio-button value="right">右侧 RPUSH</a-radio-button>
+            <a-radio-button value="left">{{ t('editors.pushLeft') }}</a-radio-button>
+            <a-radio-button value="right">{{ t('editors.pushRight') }}</a-radio-button>
           </a-radio-group>
         </a-form-item>
-        <a-form-item label="值">
+        <a-form-item :label="t('common.value')">
           <a-textarea v-model:value="editValue" :rows="5" class="mono" />
         </a-form-item>
       </a-form>

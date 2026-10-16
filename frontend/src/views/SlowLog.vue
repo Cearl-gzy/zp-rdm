@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, ClearOutlined } from '@ant-design/icons-vue'
 import { SlowLog, SlowLogReset } from '../../wailsjs/go/service/ServerService'
@@ -7,6 +8,7 @@ import type { SlowLogEntry } from '../types'
 import { formatTime } from '../utils/format'
 
 const props = defineProps<{ connId: string; db: number }>()
+const { t } = useI18n()
 
 const logs = ref<SlowLogEntry[]>([])
 const loading = ref(false)
@@ -27,13 +29,13 @@ onMounted(load)
 
 function reset() {
   Modal.confirm({
-    title: '清空慢日志',
-    content: '确定执行 SLOWLOG RESET 吗？',
-    okText: '清空', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('slowlog.resetTitle'),
+    content: t('slowlog.resetContent'),
+    okText: t('slowlog.resetOk'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         await SlowLogReset(props.connId, props.db)
-        message.success('已清空')
+        message.success(t('slowlog.resetDone'))
         load()
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -54,33 +56,30 @@ function durationClass(us: number): string {
   return 'dur-fast'
 }
 
-const columns = [
+const columns = computed(() => [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
-  { title: '时间', dataIndex: 'timestamp', key: 'timestamp', width: 170 },
-  { title: '耗时', dataIndex: 'durationUs', key: 'durationUs', width: 110 },
-  { title: '客户端', dataIndex: 'clientAddr', key: 'clientAddr', width: 160 },
-  { title: '命令', key: 'args' },
-]
+  { title: t('slowlog.colTime'), dataIndex: 'timestamp', key: 'timestamp', width: 170 },
+  { title: t('slowlog.colDuration'), dataIndex: 'durationUs', key: 'durationUs', width: 110 },
+  { title: t('slowlog.colClient'), dataIndex: 'clientAddr', key: 'clientAddr', width: 160 },
+  { title: t('slowlog.colCmd'), key: 'args' },
+])
 </script>
 
 <template>
   <div class="slowlog">
     <div class="sl-toolbar">
       <a-select v-model:value="count" size="small" style="width: 120px" @change="load">
-        <a-select-option :value="32">最近 32 条</a-select-option>
-        <a-select-option :value="128">最近 128 条</a-select-option>
-        <a-select-option :value="512">最近 512 条</a-select-option>
-        <a-select-option :value="1024">最近 1024 条</a-select-option>
+        <a-select-option v-for="n in [32, 128, 512, 1024]" :key="n" :value="n">{{ t('slowlog.recentN', { n }) }}</a-select-option>
       </a-select>
       <a-button size="small" :loading="loading" @click="load">
         <template #icon><ReloadOutlined /></template>
-        刷新
+        {{ t('common.refresh') }}
       </a-button>
       <a-button size="small" danger @click="reset">
         <template #icon><ClearOutlined /></template>
         SLOWLOG RESET
       </a-button>
-      <span class="text-3" style="font-size: 11px; margin-left: auto">阈值由 slowlog-log-slower-than 配置决定</span>
+      <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('slowlog.thresholdTip') }}</span>
     </div>
 
     <div class="sl-table">

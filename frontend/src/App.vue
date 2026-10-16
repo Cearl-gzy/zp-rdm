@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { theme } from 'ant-design-vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
+import enUS from 'ant-design-vue/es/locale/en_US'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import { useAppStore } from './stores/app'
 import { useConnectionStore } from './stores/connection'
@@ -14,6 +16,9 @@ import ConnectionView from './views/ConnectionView.vue'
 
 const app = useAppStore()
 const conn = useConnectionStore()
+const { t, locale } = useI18n()
+
+const antdLocale = computed(() => (locale.value === 'en' ? enUS : zhCN))
 
 onMounted(async () => {
   await app.initSettings()
@@ -78,7 +83,7 @@ const themeConfig = computed(() => ({
 </script>
 
 <template>
-  <a-config-provider :locale="zhCN" :theme="themeConfig">
+  <a-config-provider :locale="antdLocale" :theme="themeConfig">
     <div class="window-root">
       <TitleBar />
       <div class="app-split">
@@ -92,7 +97,7 @@ const themeConfig = computed(() => ({
               :key="tab.id"
               class="tabbar-item"
               :class="{ active: conn.activeTab === tab.id }"
-              :title="`${tab.state.name}（中键关闭）`"
+              :title="t('app.tabMiddleClose', { name: tab.state.name })"
               @click="conn.activeTab = tab.id"
               @click.middle.prevent="conn.close(tab.id)"
             >

@@ -1,0 +1,21 @@
+export default {
+  jsonEditor: {
+    modeText: '文本',
+    modeTree: '树形',
+    format: '格式化',
+    formatted: '已格式化',
+    invalidJson: '内容不是合法 JSON',
+    chars: '{n} 字符',
+    truncatedTag: '已截断（预览 1MB）',
+    loadFull: '加载完整值',
+    fullLoaded: '已加载完整内容',
+    saved: '已保存',
+    savedPath: '已保存 {path}',
+    summaryArray: '数组 · {n} 项',
+    summaryObject: '对象 · {n} 键',
+    treeOverflow: '文档过大，树形仅展示前 {n} 个节点',
+    invalidJsonEmpty: '内容不是合法 JSON，请切换到文本模式修正',
+    editNodeTitle: '编辑节点',
+    editNodeHint: '通过 JSON.SET 路径级写入，仅更新该节点，文档其余部分与 TTL 不受影响',
+  },
+}

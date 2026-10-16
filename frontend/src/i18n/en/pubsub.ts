@@ -1,0 +1,19 @@
+export default {
+  pubsub: {
+    subscribeChannels: 'Subscribe Channels',
+    channelPlaceholder: 'Channel name, * patterns supported',
+    pattern: 'Pattern',
+    subscribed: 'Subscribed',
+    noSubscriptions: 'No subscriptions',
+    publishMessage: 'Publish Message',
+    activeChannels: 'Active Channels',
+    publishChannelPlaceholder: 'Channel',
+    messagePlaceholder: 'Message content',
+    publish: 'Publish',
+    channelRequired: 'Please enter a channel',
+    publishedTo: 'Published to {n} subscribers',
+    messageLog: 'Message Log ({n})',
+    clear: 'Clear',
+    waitingForMessages: 'Subscribe and wait for messages…',
+  },
+}

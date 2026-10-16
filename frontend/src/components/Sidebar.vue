@@ -9,6 +9,8 @@ import {
 } from '@ant-design/icons-vue'
 import { PickOpenFile, PickSaveFile, CheckUpdate } from '../../wailsjs/go/main/App'
 import { BrowserOpenURL, Environment } from '../../wailsjs/runtime/runtime'
+import { useI18n } from 'vue-i18n'
+import { setLocale, localeOptions } from '../i18n'
 import { useAppStore } from '../stores/app'
 import { useConnectionStore } from '../stores/connection'
 import { onAppEvent, AppEvents } from '../utils/events'
@@ -17,6 +19,9 @@ import ConnectionForm from './ConnectionForm.vue'
 
 const app = useAppStore()
 const conn = useConnectionStore()
+const { t, locale } = useI18n()
+
+function onLangChange(v: string) { setLocale(v as 'zh-CN' | 'en') }
 
 const keyword = ref('')
 const collapsedGroups = ref<Set<string>>(new Set())
@@ -59,24 +64,24 @@ async function onOpen(id: string) {
 
 function onDelete(p: ConnectionProfile) {
   Modal.confirm({
-    title: '删除连接',
-    content: `确定删除「${p.name}」吗？此操作不可恢复。`,
-    okText: '删除',
+    title: t('sidebar.deleteTitle'),
+    content: t('sidebar.deleteContent', { name: p.name }),
+    okText: t('common.delete'),
     okButtonProps: { danger: true },
-    cancelText: '取消',
+    cancelText: t('common.cancel'),
     async onOk() {
       await conn.remove(p.id)
-      message.success('已删除')
+      message.success(t('sidebar.deleted'))
     },
   })
 }
 
 async function onExport() {
   try {
-    const path = await PickSaveFile('导出连接配置', 'zp-rdm-connections.json')
+    const path = await PickSaveFile(t('sidebar.exportDialogTitle'), 'zp-rdm-connections.json')
     if (!path) return
     await conn.exportTo(path)
-    message.success('导出成功')
+    message.success(t('sidebar.exportSuccess'))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   }
@@ -84,10 +89,10 @@ async function onExport() {
 
 async function onImport() {
   try {
-    const path = await PickOpenFile('导入连接配置')
+    const path = await PickOpenFile(t('sidebar.importDialogTitle'))
     if (!path) return
     const n = await conn.importFrom(path)
-    message.success(`成功导入 ${n} 个连接`)
+    message.success(t('sidebar.importSuccess', { n }))
   } catch (e: any) {
     message.error(String(e?.message ?? e))
   }
@@ -132,9 +137,9 @@ const checking = ref(false)
 // 平台感知的密码存储说明
 const platform = ref('')
 const securityText = computed(() => {
-  if (platform.value === 'windows') return '连接密码已通过 Windows DPAPI 加密存储'
-  if (platform.value === 'darwin') return '连接密码已通过 macOS 钥匙串加密存储'
-  return '连接密码已通过系统密钥环（Secret Service）加密存储'
+  if (platform.value === 'windows') return t('sidebar.securityWin')
+  if (platform.value === 'darwin') return t('sidebar.securityMac')
+  return t('sidebar.securityLinux')
 })
 onMounted(async () => {
   try { platform.value = (await Environment()).platform } catch { /* 忽略 */ }
@@ -145,14 +150,14 @@ async function onCheckUpdate() {
     const url = await CheckUpdate()
     if (url) {
       Modal.confirm({
-        title: '发现新版本',
-        content: '是否打开下载页面？',
-        okText: '前往下载',
-        cancelText: '取消',
+        title: t('sidebar.updateTitle'),
+        content: t('sidebar.updateContent'),
+        okText: t('sidebar.updateOk'),
+        cancelText: t('common.cancel'),
         onOk: () => BrowserOpenURL(url),
       })
     } else {
-      message.success('当前已是最新版本')
+      message.success(t('sidebar.alreadyLatest'))
     }
   } catch (e: any) {
     message.warning(String(e?.message ?? e))
@@ -168,7 +173,7 @@ async function onCheckUpdate() {
     <div class="side-actions">
       <a-input
         v-model:value="keyword"
-        placeholder="搜索连接"
+        :placeholder="t('sidebar.searchPlaceholder')"
         allow-clear
         size="small"
         class="search-input"
@@ -180,18 +185,18 @@ async function onCheckUpdate() {
         <template #overlay>
           <a-menu>
             <a-menu-item key="import" @click="onImport">
-              <ImportOutlined /> 导入连接
+              <ImportOutlined /> {{ t('sidebar.importConnections') }}
             </a-menu-item>
             <a-menu-item key="export" @click="onExport">
-              <ExportOutlined /> 导出连接
+              <ExportOutlined /> {{ t('sidebar.exportConnections') }}
             </a-menu-item>
           </a-menu>
         </template>
       </a-dropdown>
-      <a-tooltip title="新建连接（Ctrl+N）">
+      <a-tooltip :title="t('sidebar.newTooltip')">
         <a-button type="primary" size="small" class="new-btn" @click="openForm()">
           <template #icon><PlusOutlined /></template>
-          新建
+          {{ t('sidebar.new') }}
         </a-button>
       </a-tooltip>
     </div>
@@ -199,10 +204,10 @@ async function onCheckUpdate() {
     <div class="conn-list">
       <div v-if="!filteredGroups.length" class="list-empty">
         <div class="empty-icon"><DatabaseOutlined /></div>
-        <div class="list-empty-text">{{ keyword ? '没有匹配的连接' : '暂无连接' }}</div>
+        <div class="list-empty-text">{{ keyword ? t('sidebar.noMatch') : t('sidebar.empty') }}</div>
         <button v-if="!keyword" class="empty-new-btn" @click="openForm()">
           <PlusOutlined />
-          <span>新建连接</span>
+          <span>{{ t('sidebar.newConnection') }}</span>
         </button>
       </div>
 
@@ -236,24 +241,24 @@ async function onCheckUpdate() {
                 <button class="item-more" @click.stop><MoreOutlined /></button>
                 <template #overlay>
                   <a-menu>
-                    <a-menu-item key="open" @click="onOpen(p.id)">打开连接</a-menu-item>
-                    <a-menu-item key="edit" @click="openForm(p)">编辑</a-menu-item>
-                    <a-menu-item key="dup" @click="conn.duplicate(p.id).then(() => message.success('已复制'))">复制</a-menu-item>
-                    <a-menu-item v-if="conn.openIds.has(p.id)" key="close" @click="conn.close(p.id)">关闭连接</a-menu-item>
+                    <a-menu-item key="open" @click="onOpen(p.id)">{{ t('sidebar.openConnection') }}</a-menu-item>
+                    <a-menu-item key="edit" @click="openForm(p)">{{ t('common.edit') }}</a-menu-item>
+                    <a-menu-item key="dup" @click="conn.duplicate(p.id).then(() => message.success(t('sidebar.duplicated')))">{{ t('common.copy') }}</a-menu-item>
+                    <a-menu-item v-if="conn.openIds.has(p.id)" key="close" @click="conn.close(p.id)">{{ t('sidebar.closeConnection') }}</a-menu-item>
                     <a-menu-divider />
-                    <a-menu-item key="del" danger @click="onDelete(p)">删除</a-menu-item>
+                    <a-menu-item key="del" danger @click="onDelete(p)">{{ t('common.delete') }}</a-menu-item>
                   </a-menu>
                 </template>
               </a-dropdown>
             </div>
             <template #overlay>
               <a-menu>
-                <a-menu-item key="open" @click="onOpen(p.id)">打开连接</a-menu-item>
-                <a-menu-item key="edit" @click="openForm(p)">编辑</a-menu-item>
-                <a-menu-item key="dup" @click="conn.duplicate(p.id).then(() => message.success('已复制'))">复制</a-menu-item>
-                <a-menu-item v-if="conn.openIds.has(p.id)" key="close" @click="conn.close(p.id)">关闭连接</a-menu-item>
+                <a-menu-item key="open" @click="onOpen(p.id)">{{ t('sidebar.openConnection') }}</a-menu-item>
+                <a-menu-item key="edit" @click="openForm(p)">{{ t('common.edit') }}</a-menu-item>
+                <a-menu-item key="dup" @click="conn.duplicate(p.id).then(() => message.success(t('sidebar.duplicated')))">{{ t('common.copy') }}</a-menu-item>
+                <a-menu-item v-if="conn.openIds.has(p.id)" key="close" @click="conn.close(p.id)">{{ t('sidebar.closeConnection') }}</a-menu-item>
                 <a-menu-divider />
-                <a-menu-item key="del" danger @click="onDelete(p)">删除</a-menu-item>
+                <a-menu-item key="del" danger @click="onDelete(p)">{{ t('common.delete') }}</a-menu-item>
               </a-menu>
             </template>
           </a-dropdown>
@@ -262,18 +267,21 @@ async function onCheckUpdate() {
     </div>
 
     <div class="side-footer">
-      <a-tooltip title="关于 / 检查更新">
+      <a-tooltip :title="t('sidebar.aboutUpdate')">
         <button class="footer-version num" @click="aboutVisible = true">
           ZP RDM v{{ app.version || '…' }}
         </button>
       </a-tooltip>
       <div class="footer-actions">
-        <a-tooltip title="命令面板（Ctrl+K）">
+        <a-tooltip :title="t('sidebar.paletteTooltip')">
           <button class="icon-btn" @click="app.togglePalette(true)">
             <ThunderboltOutlined />
           </button>
         </a-tooltip>
-        <a-tooltip :title="app.dark ? '切换浅色' : '切换深色'">
+        <a-tooltip :title="t('app.language')">
+          <a-select :value="locale" size="small" class="lang-select" :bordered="false" :options="localeOptions" @change="onLangChange" />
+        </a-tooltip>
+        <a-tooltip :title="app.dark ? t('sidebar.switchLight') : t('sidebar.switchDark')">
           <button class="icon-btn" @click="app.toggleTheme()">
             <component :is="app.dark ? BulbFilled : BulbOutlined" />
           </button>
@@ -283,19 +291,19 @@ async function onCheckUpdate() {
 
     <ConnectionForm v-model:open="formVisible" :profile="editing" />
 
-    <a-modal v-model:open="aboutVisible" title="关于 ZP Redis Manager" :width="380" :footer="null">
+    <a-modal v-model:open="aboutVisible" :title="t('sidebar.aboutTitle')" :width="380" :footer="null">
       <div class="about-body">
         <div class="about-logo" />
         <div class="about-name">ZP Redis Manager</div>
         <div class="about-version num">v{{ app.version || '…' }}</div>
-        <div class="about-desc">轻量、精美、功能完善的 Redis 桌面管理工具</div>
+        <div class="about-desc">{{ t('sidebar.aboutDesc') }}</div>
         <div class="about-security">
           <SafetyCertificateOutlined />
           <span>{{ securityText }}</span>
         </div>
         <a-button block :loading="checking" @click="onCheckUpdate">
           <template v-if="!checking" #icon><CloudSyncOutlined /></template>
-          {{ checking ? '检查中…' : '检查更新' }}
+          {{ checking ? t('sidebar.checking') : t('sidebar.checkUpdate') }}
         </a-button>
       </div>
     </a-modal>
@@ -471,7 +479,8 @@ async function onCheckUpdate() {
   transition: color 0.12s, background 0.12s;
 }
 .footer-version:hover { color: var(--text-1); background: var(--bg-hover); }
-.footer-actions { display: flex; gap: 2px; }
+.footer-actions { display: flex; gap: 2px; align-items: center; }
+.lang-select { width: 88px; }
 
 /* ---------- 关于弹窗 ---------- */
 .about-body {

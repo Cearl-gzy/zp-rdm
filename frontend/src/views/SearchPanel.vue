@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal, Checkbox } from 'ant-design-vue'
 import { SearchOutlined, LinkOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import {
@@ -15,6 +16,8 @@ interface AggRow { [k: string]: string }
 interface AggResult { total: number; rows: AggRow[] }
 
 const props = defineProps<{ connId: string; db: number }>()
+
+const { t } = useI18n()
 
 const mode = ref<'search' | 'agg'>('search')
 const indexes = ref<string[]>([])
@@ -74,10 +77,10 @@ function autoAlias(f: { name: string; path: string }) {
 
 async function submitCreate() {
   const f = createForm.value
-  if (!f.name.trim()) { message.warning('请输入索引名'); return }
+  if (!f.name.trim()) { message.warning(t('search.msg.nameRequired')); return }
   const prefixes = f.prefixes.split(',').map(p => p.trim()).filter(Boolean)
-  if (!prefixes.length) { message.warning('至少一个键前缀'); return }
-  if (!f.fields.length) { message.warning('至少一个字段'); return }
+  if (!prefixes.length) { message.warning(t('search.msg.prefixRequired')); return }
+  if (!f.fields.length) { message.warning(t('search.msg.fieldRequired')); return }
   creating.value = true
   try {
     await SearchCreateIndex({
@@ -85,7 +88,7 @@ async function submitCreate() {
       name: f.name.trim(), on: f.on, prefixes,
       fields: f.fields.map(x => ({ name: x.name.trim(), path: x.path.trim(), type: x.type, sortable: x.sortable })),
     } as any)
-    message.success(`索引 ${f.name.trim()} 已创建`)
+    message.success(t('search.msg.created', { name: f.name.trim() }))
     createOpen.value = false
     await loadIndexes()
     index.value = f.name.trim()
@@ -103,21 +106,21 @@ function dropIndex() {
   const name = index.value
   dropDD.value = false
   Modal.confirm({
-    title: `删除索引 ${name}?`,
+    title: t('search.drop.title', { name }),
     content: () => h('label', { style: 'display:flex;align-items:center;gap:6px;cursor:pointer' }, [
       h(Checkbox, {
         checked: dropDD.value,
         'onUpdate:checked': (v: boolean) => { dropDD.value = v },
       }),
-      h('span', '连同文档一起删除（DD，不可恢复）'),
+      h('span', t('search.drop.ddLabel')),
     ]),
-    okText: '删除',
+    okText: t('common.delete'),
     okButtonProps: { danger: true },
-    cancelText: '取消',
+    cancelText: t('common.cancel'),
     onOk: async () => {
       try {
         await SearchDropIndex(props.connId, props.db, name, dropDD.value)
-        message.success(`索引 ${name} 已删除`)
+        message.success(t('search.msg.deleted', { name }))
         result.value = null; aggResult.value = null; searched.value = false; aggRan.value = false
         await loadIndexes()
       } catch (e: any) {
@@ -157,8 +160,8 @@ watch(index, () => {
 })
 
 async function search(toPage = 1) {
-  if (!index.value) { message.warning('请选择索引'); return }
-  if (!query.value.trim()) { message.warning('请输入查询语句'); return }
+  if (!index.value) { message.warning(t('search.msg.selectIndex')); return }
+  if (!query.value.trim()) { message.warning(t('search.msg.enterQuery')); return }
   searching.value = true
   try {
     page.value = toPage
@@ -183,7 +186,7 @@ function removeReducer(i: number) {
 }
 
 async function runAgg() {
-  if (!index.value) { message.warning('请选择索引'); return }
+  if (!index.value) { message.warning(t('search.msg.selectIndex')); return }
   agging.value = true
   try {
     aggResult.value = (await SearchAggregate({
@@ -229,11 +232,11 @@ const fieldTypeColor: Record<string, string> = {
   TEXT: 'blue', TAG: 'green', NUMERIC: 'orange', GEO: 'purple', VECTOR: 'magenta',
 }
 
-const columns = [
-  { title: '键', key: 'key', width: 220 },
-  { title: '内容', key: 'content' },
+const columns = computed(() => [
+  { title: t('common.key'), key: 'key', width: 220 },
+  { title: t('search.colContent'), key: 'content' },
   { title: '', key: 'action', width: 70 },
-]
+])
 
 const total = computed(() => result.value?.total ?? 0)
 const schemaFieldOptions = computed(() => schema.value.map(f => ({ value: f.name, label: `${f.name} (${f.type})` })))
@@ -244,21 +247,21 @@ onMounted(loadIndexes)
 <template>
   <div class="search-panel">
     <div class="sp-toolbar">
-      <a-segmented v-model:value="mode" size="small" :options="[{ value: 'search', label: '搜索' }, { value: 'agg', label: '聚合' }]" />
+      <a-segmented v-model:value="mode" size="small" :options="[{ value: 'search', label: t('common.search') }, { value: 'agg', label: t('search.modeAgg') }]" />
       <a-select
         v-model:value="index"
         size="small"
         style="width: 170px"
-        placeholder="选择索引"
+        :placeholder="t('search.selectIndex')"
         :options="indexes.map(i => ({ value: i, label: i }))"
         :not-found-content="null"
       />
-      <a-tooltip title="新建索引">
+      <a-tooltip :title="t('search.newIndex')">
         <a-button size="small" @click="openCreate">
           <template #icon><PlusOutlined /></template>
         </a-button>
       </a-tooltip>
-      <a-tooltip title="删除当前索引">
+      <a-tooltip :title="t('search.dropCurrentIndex')">
         <a-button size="small" danger :disabled="!index" @click="dropIndex">
           <template #icon><DeleteOutlined /></template>
         </a-button>
@@ -269,13 +272,13 @@ onMounted(loadIndexes)
           v-model:value="query"
           size="small"
           class="sp-query mono"
-          placeholder='查询语法：* | hello | @name:alice | @age:[18 30] | @city:{北京}'
+          :placeholder="t('search.queryPlaceholder')"
           allow-clear
           @press-enter="search(1)"
         />
         <a-button size="small" type="primary" :loading="searching" @click="search(1)">
           <template #icon><SearchOutlined /></template>
-          搜索
+          {{ t('common.search') }}
         </a-button>
       </template>
       <template v-else>
@@ -283,19 +286,19 @@ onMounted(loadIndexes)
           v-model:value="aggQuery"
           size="small"
           class="sp-query mono"
-          placeholder="过滤查询（空 = *），如 @region:{north}"
+          :placeholder="t('search.aggQueryPlaceholder')"
           allow-clear
           @press-enter="runAgg"
         />
         <a-button size="small" type="primary" :loading="agging" @click="runAgg">
           <template #icon><SearchOutlined /></template>
-          聚合
+          {{ t('search.modeAgg') }}
         </a-button>
       </template>
     </div>
 
     <div v-if="schema.length" class="sp-schema">
-      <span class="text-3" style="font-size: 11px">字段：</span>
+      <span class="text-3" style="font-size: 11px">{{ t('search.fieldsLabel') }}</span>
       <a-tag v-for="f in schema" :key="f.name" :color="fieldTypeColor[f.type] ?? 'default'" class="sp-field-tag">
         <span class="mono">{{ f.name }}</span>
         <span class="sp-field-type">{{ f.type }}</span>
@@ -312,7 +315,7 @@ onMounted(loadIndexes)
           mode="multiple"
           size="small"
           class="sp-agg-fields"
-          placeholder="分组字段（可不选 = 全量聚合）"
+          :placeholder="t('search.groupByPlaceholder')"
           :options="schemaFieldOptions"
           :max-tag-count="3"
         />
@@ -322,8 +325,8 @@ onMounted(loadIndexes)
         <a-select v-model:value="r.func" size="small" style="width: 150px"
           :options="aggFuncs.map(f => ({ value: f, label: f }))" />
         <a-select v-if="r.func !== 'COUNT'" v-model:value="r.field" size="small" style="width: 160px"
-          placeholder="字段" :options="schemaFieldOptions" allow-clear />
-        <a-input v-model:value="r.alias" size="small" style="width: 130px" placeholder="别名（可空）" class="mono" allow-clear />
+          :placeholder="t('common.field')" :options="schemaFieldOptions" allow-clear />
+        <a-input v-model:value="r.alias" size="small" style="width: 130px" :placeholder="t('search.aliasPlaceholder')" class="mono" allow-clear />
         <a-button size="small" type="text" danger @click="removeReducer(i)">
           <template #icon><DeleteOutlined /></template>
         </a-button>
@@ -331,7 +334,7 @@ onMounted(loadIndexes)
       <div class="sp-agg-row">
         <a-button size="small" type="dashed" @click="addReducer">
           <template #icon><PlusOutlined /></template>
-          添加聚合器
+          {{ t('search.addReducer') }}
         </a-button>
       </div>
     </div>
@@ -339,15 +342,15 @@ onMounted(loadIndexes)
     <div class="sp-body">
       <a-empty v-if="!indexes.length" style="margin-top: 60px">
         <template #description>
-          当前 DB 没有 RediSearch 索引，
-          <a-button type="link" size="small" style="padding: 0" @click="openCreate">新建一个</a-button>
+          {{ t('search.noIndexes') }}
+          <a-button type="link" size="small" style="padding: 0" @click="openCreate">{{ t('search.createOne') }}</a-button>
         </template>
       </a-empty>
 
       <!-- 搜索结果 -->
       <template v-else-if="mode === 'search'">
-        <a-empty v-if="searched && !total" description="无匹配结果" style="margin-top: 60px" />
-        <a-empty v-else-if="!searched" description="输入查询语句开始搜索，支持 RediSearch 查询语法" style="margin-top: 60px" />
+        <a-empty v-if="searched && !total" :description="t('search.noMatches')" style="margin-top: 60px" />
+        <a-empty v-else-if="!searched" :description="t('search.searchHint')" style="margin-top: 60px" />
         <template v-else>
           <a-table
             :columns="columns"
@@ -372,7 +375,7 @@ onMounted(loadIndexes)
             </template>
           </a-table>
           <div class="sp-pager">
-            <span class="text-3" style="font-size: 11.5px">共 {{ total }} 条</span>
+            <span class="text-3" style="font-size: 11.5px">{{ t('common.total', { n: total }) }}</span>
             <a-pagination
               :current="page"
               :page-size="pageSize"
@@ -387,8 +390,8 @@ onMounted(loadIndexes)
 
       <!-- 聚合结果 -->
       <template v-else>
-        <a-empty v-if="aggRan && !(aggResult?.rows.length)" description="无聚合结果" style="margin-top: 60px" />
-        <a-empty v-else-if="!aggRan" description="选择分组字段与聚合器，或直接全量聚合" style="margin-top: 60px" />
+        <a-empty v-if="aggRan && !(aggResult?.rows.length)" :description="t('search.noAggResult')" style="margin-top: 60px" />
+        <a-empty v-else-if="!aggRan" :description="t('search.aggHint')" style="margin-top: 60px" />
         <template v-else>
           <a-table
             :columns="aggColumns"
@@ -403,7 +406,7 @@ onMounted(loadIndexes)
             </template>
           </a-table>
           <div class="sp-pager">
-            <span class="text-3" style="font-size: 11.5px">{{ aggResult?.rows.length ?? 0 }} 行（上限 200）</span>
+            <span class="text-3" style="font-size: 11.5px">{{ t('search.aggRows', { n: aggResult?.rows.length ?? 0 }) }}</span>
           </div>
         </template>
       </template>
@@ -412,37 +415,37 @@ onMounted(loadIndexes)
     <!-- 新建索引向导 -->
     <a-modal
       v-model:open="createOpen"
-      title="新建索引"
+      :title="t('search.create.title')"
       width="640px"
       :confirm-loading="creating"
-      ok-text="创建"
-      cancel-text="取消"
+      :ok-text="t('common.create')"
+      :cancel-text="t('common.cancel')"
       @ok="submitCreate"
     >
       <a-form layout="vertical" size="small">
         <div class="sp-form-row">
-          <a-form-item label="索引名" class="sp-form-grow">
+          <a-form-item :label="t('search.create.nameLabel')" class="sp-form-grow">
             <a-input v-model:value="createForm.name" class="mono" placeholder="idx:users" />
           </a-form-item>
-          <a-form-item label="数据类型" style="width: 160px">
+          <a-form-item :label="t('search.create.onLabel')" style="width: 160px">
             <a-radio-group v-model:value="createForm.on" option-type="button" button-style="solid"
               :options="[{ value: 'JSON', label: 'JSON' }, { value: 'HASH', label: 'HASH' }]" />
           </a-form-item>
         </div>
-        <a-form-item label="键前缀（逗号分隔，命中前缀的键才会被索引）">
+        <a-form-item :label="t('search.create.prefixLabel')">
           <a-input v-model:value="createForm.prefixes" class="mono" placeholder="user:, profile:" />
         </a-form-item>
-        <a-form-item label="Schema 字段">
+        <a-form-item :label="t('search.create.schemaFields')">
           <div v-for="(f, i) in createForm.fields" :key="i" class="sp-field-row">
             <a-input
               v-model:value="f.path"
               class="mono sp-field-path"
-              :placeholder="createForm.on === 'JSON' ? '$.name' : '字段名（可空=别名）'"
+              :placeholder="createForm.on === 'JSON' ? '$.name' : t('search.create.pathPlaceholderHash')"
               @blur="autoAlias(f)"
             />
-            <a-input v-model:value="f.name" class="mono" style="width: 120px" placeholder="别名" />
+            <a-input v-model:value="f.name" class="mono" style="width: 120px" :placeholder="t('search.create.aliasPlaceholder')" />
             <a-select v-model:value="f.type" style="width: 110px"
-              :options="['TEXT', 'TAG', 'NUMERIC', 'GEO'].map(t => ({ value: t, label: t }))" />
+              :options="['TEXT', 'TAG', 'NUMERIC', 'GEO'].map(ft => ({ value: ft, label: ft }))" />
             <a-checkbox v-model:checked="f.sortable">Sortable</a-checkbox>
             <a-button size="small" type="text" danger :disabled="createForm.fields.length <= 1" @click="removeCreateField(i)">
               <template #icon><DeleteOutlined /></template>
@@ -450,10 +453,10 @@ onMounted(loadIndexes)
           </div>
           <a-button size="small" type="dashed" block style="margin-top: 6px" @click="addCreateField">
             <template #icon><PlusOutlined /></template>
-            添加字段
+            {{ t('search.create.addField') }}
           </a-button>
           <div class="text-3" style="font-size: 11px; margin-top: 6px">
-            复杂场景（VECTOR / SORTABLE UNF / 停用词等）请用 CLI 执行原生命令 FT.CREATE
+            {{ t('search.create.advancedHint') }}
           </div>
         </a-form-item>
       </a-form>

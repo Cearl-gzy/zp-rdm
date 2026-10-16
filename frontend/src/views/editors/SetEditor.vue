@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { SetGet, SetAdd, SetRemove, SetUpdate } from '../../../wailsjs/go/service/ValueService'
 import type { ScanItems } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
+
+const { t } = useI18n()
 
 const items = ref<string[]>([])
 const cursor = ref(0)
@@ -54,7 +57,7 @@ function openEdit(member: string) {
 }
 
 async function save() {
-  if (!editValue.value) { message.warning('成员不能为空'); return }
+  if (!editValue.value) { message.warning(t('editors.memberRequired')); return }
   saving.value = true
   try {
     if (editMode.value === 'add') {
@@ -62,7 +65,7 @@ async function save() {
     } else if (editValue.value !== original.value) {
       await SetUpdate(props.connId, props.db, props.keyName, original.value, editValue.value)
     }
-    message.success('已保存')
+    message.success(t('editors.saved'))
     editVisible.value = false
     load(true)
   } catch (e: any) {
@@ -74,15 +77,15 @@ async function save() {
 
 function remove(member: string) {
   Modal.confirm({
-    title: '删除成员',
-    content: `确定删除成员「${member}」吗？`,
-    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('editors.deleteMember'),
+    content: t('editors.deleteMemberContent', { member }),
+    okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         await SetRemove(props.connId, props.db, props.keyName, [member])
         items.value = items.value.filter(m => m !== member)
         total.value--
-        message.success('已删除')
+        message.success(t('editors.deleted'))
       } catch (e: any) {
         message.error(String(e?.message ?? e))
       }
@@ -92,10 +95,10 @@ function remove(member: string) {
 
 const tableData = computed(() => items.value.map(m => ({ member: m })))
 
-const columns = [
-  { title: '成员', dataIndex: 'member', key: 'member' },
-  { title: '操作', key: 'ops', width: 90 },
-]
+const columns = computed(() => [
+  { title: t('editors.member'), dataIndex: 'member', key: 'member' },
+  { title: t('common.actions'), key: 'ops', width: 90 },
+])
 </script>
 
 <template>
@@ -104,7 +107,7 @@ const columns = [
       <a-input
         v-model:value="pattern"
         size="small"
-        placeholder="成员匹配"
+        :placeholder="t('editors.patternMember')"
         allow-clear
         style="width: 220px"
         @press-enter="load(true)"
@@ -116,9 +119,9 @@ const columns = [
       </a-button>
       <a-button size="small" type="primary" @click="openAdd">
         <template #icon><PlusOutlined /></template>
-        添加成员
+        {{ t('editors.addMember') }}
       </a-button>
-      <span class="text-3" style="font-size: 11px; margin-left: auto">共 {{ total }} 成员</span>
+      <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('editors.totalMembers', { n: total }) }}</span>
     </div>
 
     <div class="ce-table">
@@ -144,15 +147,15 @@ const columns = [
     </div>
 
     <div class="ce-footer" v-if="cursor !== 0">
-      <a-button size="small" type="link" :loading="loading" @click="load(false)">加载更多（已加载 {{ items.length }}）</a-button>
+      <a-button size="small" type="link" :loading="loading" @click="load(false)">{{ t('editors.loadMoreLoaded', { n: items.length }) }}</a-button>
     </div>
 
     <a-modal
       v-model:open="editVisible"
-      :title="editMode === 'add' ? '添加成员' : '编辑成员'"
+      :title="editMode === 'add' ? t('editors.addMember') : t('editors.editMember')"
       width="480px"
       :confirm-loading="saving"
-      ok-text="保存" cancel-text="取消"
+      :ok-text="t('common.save')" :cancel-text="t('common.cancel')"
       @ok="save"
     >
       <a-textarea v-model:value="editValue" :rows="5" class="mono" />

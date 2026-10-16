@@ -1,0 +1,21 @@
+export default {
+  jsonEditor: {
+    modeText: 'Text',
+    modeTree: 'Tree',
+    format: 'Format',
+    formatted: 'Formatted',
+    invalidJson: 'Content is not valid JSON',
+    chars: '{n} chars',
+    truncatedTag: 'Truncated (1MB preview)',
+    loadFull: 'Load Full Value',
+    fullLoaded: 'Full content loaded',
+    saved: 'Saved',
+    savedPath: 'Saved {path}',
+    summaryArray: 'Array · {n} items',
+    summaryObject: 'Object · {n} keys',
+    treeOverflow: 'Document too large, showing first {n} nodes only',
+    invalidJsonEmpty: 'Content is not valid JSON. Switch to text mode to fix it',
+    editNodeTitle: 'Edit Node',
+    editNodeHint: 'Writes via JSON.SET at path level; only this node is updated, the rest of the document and TTL are unaffected',
+  },
+}

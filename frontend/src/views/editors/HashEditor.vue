@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { HashGet, HashSet, HashDel, HashRenameField } from '../../../wailsjs/go/service/ValueService'
 import type { HashItem, ScanItems } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
+
+const { t } = useI18n()
 
 const items = ref<HashItem[]>([])
 const cursor = ref(0)
@@ -58,7 +61,7 @@ function openEdit(item: HashItem) {
 }
 
 async function save() {
-  if (!editField.value) { message.warning('字段名不能为空'); return }
+  if (!editField.value) { message.warning(t('editors.fieldRequired')); return }
   saving.value = true
   try {
     if (editMode.value === 'edit' && originalField.value !== editField.value) {
@@ -67,7 +70,7 @@ async function save() {
     } else {
       await HashSet(props.connId, props.db, props.keyName, editField.value, editValue.value)
     }
-    message.success('已保存')
+    message.success(t('editors.saved'))
     editVisible.value = false
     load(true)
   } catch (e: any) {
@@ -79,15 +82,15 @@ async function save() {
 
 function remove(item: HashItem) {
   Modal.confirm({
-    title: '删除字段',
-    content: `确定删除字段「${item.field}」吗？`,
-    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('editors.deleteField'),
+    content: t('editors.deleteFieldContent', { field: item.field }),
+    okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         await HashDel(props.connId, props.db, props.keyName, [item.field])
         items.value = items.value.filter(i => i.field !== item.field)
         total.value--
-        message.success('已删除')
+        message.success(t('editors.deleted'))
       } catch (e: any) {
         message.error(String(e?.message ?? e))
       }
@@ -95,11 +98,11 @@ function remove(item: HashItem) {
   })
 }
 
-const columns = [
-  { title: '字段', dataIndex: 'field', key: 'field', width: '38%' },
-  { title: '值', dataIndex: 'value', key: 'value' },
-  { title: '操作', key: 'ops', width: 90 },
-]
+const columns = computed(() => [
+  { title: t('common.field'), dataIndex: 'field', key: 'field', width: '38%' },
+  { title: t('common.value'), dataIndex: 'value', key: 'value' },
+  { title: t('common.actions'), key: 'ops', width: 90 },
+])
 </script>
 
 <template>
@@ -108,7 +111,7 @@ const columns = [
       <a-input
         v-model:value="pattern"
         size="small"
-        placeholder="字段匹配，如 name*"
+        :placeholder="t('editors.patternField')"
         allow-clear
         style="width: 220px"
         @press-enter="load(true)"
@@ -120,9 +123,9 @@ const columns = [
       </a-button>
       <a-button size="small" type="primary" @click="openAdd">
         <template #icon><PlusOutlined /></template>
-        添加字段
+        {{ t('editors.addField') }}
       </a-button>
-      <span class="text-3" style="font-size: 11px; margin-left: auto">共 {{ total }} 字段</span>
+      <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('editors.totalFields', { n: total }) }}</span>
     </div>
 
     <div class="ce-table">
@@ -151,22 +154,22 @@ const columns = [
     </div>
 
     <div class="ce-footer" v-if="cursor !== 0">
-      <a-button size="small" type="link" :loading="loading" @click="load(false)">加载更多（已加载 {{ items.length }}）</a-button>
+      <a-button size="small" type="link" :loading="loading" @click="load(false)">{{ t('editors.loadMoreLoaded', { n: items.length }) }}</a-button>
     </div>
 
     <a-modal
       v-model:open="editVisible"
-      :title="editMode === 'add' ? '添加字段' : '编辑字段'"
+      :title="editMode === 'add' ? t('editors.addField') : t('editors.editField')"
       width="480px"
       :confirm-loading="saving"
-      ok-text="保存" cancel-text="取消"
+      :ok-text="t('common.save')" :cancel-text="t('common.cancel')"
       @ok="save"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item label="字段名" required>
+        <a-form-item :label="t('editors.fieldName')" required>
           <a-input v-model:value="editField" class="mono" />
         </a-form-item>
-        <a-form-item label="值">
+        <a-form-item :label="t('common.value')">
           <a-textarea v-model:value="editValue" :rows="5" class="mono" />
         </a-form-item>
       </a-form>

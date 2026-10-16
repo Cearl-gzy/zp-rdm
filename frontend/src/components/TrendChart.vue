@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   data: number[]
@@ -39,7 +42,7 @@ const gid = Math.random().toString(36).slice(2, 8)
   <div class="trend">
     <div class="trend-values">
       <span class="trend-current mono">{{ format ? format(current) : current }}</span>
-      <span class="trend-peak mono">峰值 {{ format ? format(peak) : peak }}</span>
+      <span class="trend-peak mono">{{ t('trendChart.peak', { v: format ? format(peak) : peak }) }}</span>
     </div>
     <svg :viewBox="`0 0 ${W} ${height}`" preserveAspectRatio="none" class="trend-svg">
       <defs>

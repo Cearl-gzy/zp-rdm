@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.9.0-red)
+![version](https://img.shields.io/badge/version-1.10.0-red)
 
 ---
 
@@ -125,6 +125,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **窗口状态记忆** — 尺寸、位置、最大化状态、侧栏宽度（可拖拽 160–480px）、深浅主题全部持久化
 - **命令面板** — `Ctrl+K` 唤起，模糊搜索连接/视图/操作，全键盘流
 - **自动更新检查** — 关于面板一键检查新版本，命中后直达 GitHub Release
+- **中英双语界面** — 侧栏底部一键切换简体中文 / English，选择持久化，首次启动按系统语言自动判断；Ant Design 组件库文案同步切换（后端返回的 Redis 错误信息保持原文）
 - **精致 UI** — 无边框窗口 + 自定义标题栏、深色/浅色双主题、禁用右键菜单、禁用文本选择（终端区除外）
 
 ---

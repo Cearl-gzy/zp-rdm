@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   WindowMinimise, WindowToggleMaximise, WindowIsMaximised, Quit,
 } from '../../wailsjs/runtime/runtime'
 import { MinusOutlined, CloseOutlined, BorderOutlined, BlockOutlined } from '@ant-design/icons-vue'
+
+const { t } = useI18n()
 
 const maximised = ref(false)
 
@@ -36,13 +39,13 @@ function close() { Quit() }
       </div>
     </div>
     <div class="tb-controls">
-      <button class="tb-btn" title="最小化" @click="minimise">
+      <button class="tb-btn" :title="t('app.minimize')" @click="minimise">
         <MinusOutlined />
       </button>
-      <button class="tb-btn" :title="maximised ? '还原' : '最大化'" @click="toggleMaximise">
+      <button class="tb-btn" :title="maximised ? t('app.restore') : t('app.maximize')" @click="toggleMaximise">
         <component :is="maximised ? BlockOutlined : BorderOutlined" class="max-icon" />
       </button>
-      <button class="tb-btn close" title="关闭" @click="close">
+      <button class="tb-btn close" :title="t('common.close')" @click="close">
         <CloseOutlined />
       </button>
     </div>

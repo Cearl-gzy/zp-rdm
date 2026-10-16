@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusCircleOutlined, TeamOutlined, CheckOutlined } from '@ant-design/icons-vue'
 import { StreamGet, StreamAdd, StreamDel, StreamGroups, StreamConsumers, StreamPending, StreamAck, StreamGroupCreate, StreamGroupDestroy, StreamConsumerDelete } from '../../../wailsjs/go/service/ValueService'
 import type { StreamItem, ScanItems, StreamGroup, StreamConsumer, StreamPendingEntry } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
+
+const { t } = useI18n()
 
 const items = ref<StreamItem[]>([])
 const total = ref(props.total)
@@ -50,11 +53,11 @@ async function save() {
   for (const p of fieldPairs.value) {
     if (p.k) fields[p.k] = p.v
   }
-  if (!Object.keys(fields).length) { message.warning('至少填写一个字段'); return }
+  if (!Object.keys(fields).length) { message.warning(t('stream.fieldRequired')); return }
   saving.value = true
   try {
     await StreamAdd(props.connId, props.db, props.keyName, fields)
-    message.success('已添加')
+    message.success(t('stream.added'))
     addVisible.value = false
     load()
   } catch (e: any) {
@@ -66,13 +69,13 @@ async function save() {
 
 function remove(item: StreamItem) {
   Modal.confirm({
-    title: '删除条目',
-    content: `确定删除条目 ${item.id} 吗？`,
-    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('stream.deleteEntryTitle'),
+    content: t('stream.deleteEntryConfirm', { id: item.id }),
+    okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         await StreamDel(props.connId, props.db, props.keyName, [item.id])
-        message.success('已删除')
+        message.success(t('stream.deleted'))
         load()
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -85,11 +88,11 @@ function fieldsText(item: StreamItem): string {
   return JSON.stringify(item.fields)
 }
 
-const columns = [
+const columns = computed(() => [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 190 },
-  { title: '字段', key: 'fields' },
-  { title: '操作', key: 'ops', width: 70 },
-]
+  { title: t('common.field'), key: 'fields' },
+  { title: t('common.actions'), key: 'ops', width: 70 },
+])
 
 // ---------- 消费者组 ----------
 
@@ -113,14 +116,14 @@ async function loadGroups() {
   }
 }
 
-const groupColumns = [
-  { title: '组名', dataIndex: 'name', key: 'name' },
-  { title: '消费者', dataIndex: 'consumers', key: 'consumers', width: 70 },
-  { title: '待确认', dataIndex: 'pending', key: 'pending', width: 70 },
-  { title: '未交付', dataIndex: 'lag', key: 'lag', width: 70 },
-  { title: '最后交付 ID', dataIndex: 'lastDeliveredId', key: 'lastDeliveredId', width: 150 },
-  { title: '操作', key: 'ops', width: 150 },
-]
+const groupColumns = computed(() => [
+  { title: t('stream.groupName'), dataIndex: 'name', key: 'name' },
+  { title: t('stream.consumers'), dataIndex: 'consumers', key: 'consumers', width: 70 },
+  { title: t('stream.pending'), dataIndex: 'pending', key: 'pending', width: 70 },
+  { title: t('stream.lag'), dataIndex: 'lag', key: 'lag', width: 70 },
+  { title: t('stream.lastDeliveredId'), dataIndex: 'lastDeliveredId', key: 'lastDeliveredId', width: 150 },
+  { title: t('common.actions'), key: 'ops', width: 150 },
+])
 
 // 展开组 → 加载消费者
 const consumersByGroup = ref<Record<string, StreamConsumer[]>>({})
@@ -141,13 +144,13 @@ async function onGroupExpand(expanded: boolean, record: StreamGroup) {
 
 function removeConsumer(group: string, name: string) {
   Modal.confirm({
-    title: '删除消费者',
-    content: `确定删除消费者 ${name} 吗？其待确认记录将被清除（消息保留在 stream 中）。`,
-    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('stream.deleteConsumerTitle'),
+    content: t('stream.deleteConsumerConfirm', { name }),
+    okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         const n = await StreamConsumerDelete(props.connId, props.db, props.keyName, group, name)
-        message.success(`已删除，清除 ${n} 条待确认`)
+        message.success(t('stream.consumerDeleted', { n }))
         onGroupExpand(true, { name: group } as StreamGroup)
         loadGroups()
       } catch (e: any) {
@@ -157,12 +160,12 @@ function removeConsumer(group: string, name: string) {
   })
 }
 
-const consumerColumns = [
-  { title: '消费者', dataIndex: 'name', key: 'name' },
-  { title: '待确认', dataIndex: 'pending', key: 'pending', width: 80 },
-  { title: '空闲', dataIndex: 'idleMs', key: 'idleMs', width: 100 },
-  { title: '操作', key: 'ops', width: 60 },
-]
+const consumerColumns = computed(() => [
+  { title: t('stream.consumers'), dataIndex: 'name', key: 'name' },
+  { title: t('stream.pending'), dataIndex: 'pending', key: 'pending', width: 80 },
+  { title: t('stream.idle'), dataIndex: 'idleMs', key: 'idleMs', width: 100 },
+  { title: t('common.actions'), key: 'ops', width: 60 },
+])
 
 // 新建组
 const cgVisible = ref(false)
@@ -179,17 +182,17 @@ function openCreateGroup() {
 }
 
 async function createGroup() {
-  if (!cgName.value.trim()) { message.warning('请填写组名'); return }
+  if (!cgName.value.trim()) { message.warning(t('stream.groupNameRequired')); return }
   let startID = '$'
   if (cgStart.value === 'all') startID = '0'
   else if (cgStart.value === 'custom') {
     startID = cgCustomId.value.trim()
-    if (!startID) { message.warning('请填写起始 ID'); return }
+    if (!startID) { message.warning(t('stream.startIdRequired')); return }
   }
   cgSaving.value = true
   try {
     await StreamGroupCreate(props.connId, props.db, props.keyName, cgName.value.trim(), startID, false)
-    message.success('已创建')
+    message.success(t('stream.created'))
     cgVisible.value = false
     loadGroups()
   } catch (e: any) {
@@ -201,13 +204,13 @@ async function createGroup() {
 
 function destroyGroup(g: StreamGroup) {
   Modal.confirm({
-    title: '删除消费者组',
-    content: `确定删除组 ${g.name} 吗？组内待确认状态将丢失（消息保留在 stream 中）。`,
-    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    title: t('stream.deleteGroupTitle'),
+    content: t('stream.deleteGroupConfirm', { name: g.name }),
+    okText: t('common.delete'), okButtonProps: { danger: true }, cancelText: t('common.cancel'),
     async onOk() {
       try {
         await StreamGroupDestroy(props.connId, props.db, props.keyName, g.name)
-        message.success('已删除')
+        message.success(t('stream.deleted'))
         loadGroups()
       } catch (e: any) {
         message.error(String(e?.message ?? e))
@@ -242,7 +245,7 @@ async function loadPending() {
 async function ack(ids: string[]) {
   try {
     const n = await StreamAck(props.connId, props.db, props.keyName, pdGroup.value, ids)
-    message.success(`已确认 ${n} 条`)
+    message.success(t('stream.ackedN', { n }))
     loadPending()
     loadGroups()
   } catch (e: any) {
@@ -250,13 +253,13 @@ async function ack(ids: string[]) {
   }
 }
 
-const pendingColumns = [
-  { title: '消息 ID', dataIndex: 'id', key: 'id', width: 170 },
-  { title: '消费者', dataIndex: 'consumer', key: 'consumer' },
-  { title: '空闲', dataIndex: 'idleMs', key: 'idleMs', width: 90 },
-  { title: '投递次数', dataIndex: 'deliveryCount', key: 'deliveryCount', width: 80 },
-  { title: '操作', key: 'ops', width: 70 },
-]
+const pendingColumns = computed(() => [
+  { title: t('stream.messageId'), dataIndex: 'id', key: 'id', width: 170 },
+  { title: t('stream.consumers'), dataIndex: 'consumer', key: 'consumer' },
+  { title: t('stream.idle'), dataIndex: 'idleMs', key: 'idleMs', width: 90 },
+  { title: t('stream.deliveryCount'), dataIndex: 'deliveryCount', key: 'deliveryCount', width: 80 },
+  { title: t('common.actions'), key: 'ops', width: 70 },
+])
 
 function idleText(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -280,23 +283,23 @@ function idleText(ms: number): string {
         <template #icon>
           <component :is="rev ? ArrowDownOutlined : ArrowUpOutlined" />
         </template>
-        {{ rev ? '最新优先' : '最早优先' }}
+        {{ rev ? t('stream.newestFirst') : t('stream.oldestFirst') }}
       </a-button>
       <a-select v-model:value="count" size="small" style="width: 110px" @change="load">
-        <a-select-option :value="50">最近 50</a-select-option>
-        <a-select-option :value="100">最近 100</a-select-option>
-        <a-select-option :value="500">最近 500</a-select-option>
-        <a-select-option :value="1000">最近 1000</a-select-option>
+        <a-select-option :value="50">{{ t('stream.lastN', { n: 50 }) }}</a-select-option>
+        <a-select-option :value="100">{{ t('stream.lastN', { n: 100 }) }}</a-select-option>
+        <a-select-option :value="500">{{ t('stream.lastN', { n: 500 }) }}</a-select-option>
+        <a-select-option :value="1000">{{ t('stream.lastN', { n: 1000 }) }}</a-select-option>
       </a-select>
       <a-button size="small" type="primary" @click="openAdd">
         <template #icon><PlusOutlined /></template>
-        添加条目
+        {{ t('stream.addEntry') }}
       </a-button>
       <a-button size="small" @click="openGroups">
         <template #icon><TeamOutlined /></template>
-        消费者组
+        {{ t('stream.consumerGroups') }}
       </a-button>
-      <span class="text-3" style="font-size: 11px; margin-left: auto">共 {{ total }} 条目</span>
+      <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('stream.totalEntries', { n: total }) }}</span>
     </div>
 
     <div class="ce-table">
@@ -325,34 +328,34 @@ function idleText(ms: number): string {
 
     <a-modal
       v-model:open="addVisible"
-      title="添加 Stream 条目"
+      :title="t('stream.addModalTitle')"
       width="520px"
       :confirm-loading="saving"
-      ok-text="添加" cancel-text="取消"
+      :ok-text="t('common.add')" :cancel-text="t('common.cancel')"
       @ok="save"
     >
       <div v-for="(p, i) in fieldPairs" :key="i" class="pair-row">
-        <a-input v-model:value="p.k" placeholder="字段名" class="mono pair-key" />
-        <a-input v-model:value="p.v" placeholder="值" class="mono pair-val" />
+        <a-input v-model:value="p.k" :placeholder="t('stream.fieldName')" class="mono pair-key" />
+        <a-input v-model:value="p.v" :placeholder="t('common.value')" class="mono pair-val" />
         <a-button type="text" size="small" :disabled="fieldPairs.length <= 1" @click="removePair(i)">
           <template #icon><MinusCircleOutlined /></template>
         </a-button>
       </div>
       <a-button size="small" type="dashed" block style="margin-top: 8px" @click="addPair">
         <template #icon><PlusOutlined /></template>
-        添加字段
+        {{ t('stream.addField') }}
       </a-button>
     </a-modal>
 
     <!-- 消费者组管理抽屉 -->
-    <a-drawer v-model:open="groupsVisible" title="消费者组" width="760">
+    <a-drawer v-model:open="groupsVisible" :title="t('stream.consumerGroups')" width="760">
       <div class="cg-toolbar">
         <a-button size="small" :loading="groupsLoading" @click="loadGroups">
           <template #icon><ReloadOutlined /></template>
         </a-button>
         <a-button size="small" type="primary" @click="openCreateGroup">
           <template #icon><PlusOutlined /></template>
-          新建消费组
+          {{ t('stream.createGroup') }}
         </a-button>
       </div>
       <a-table
@@ -376,8 +379,8 @@ function idleText(ms: number): string {
             <span class="mono" style="font-size: 11px">{{ record.lastDeliveredId }}</span>
           </template>
           <template v-else-if="column.key === 'ops'">
-            <a-button size="small" type="link" @click="openPending(record)">待确认</a-button>
-            <a-button size="small" type="link" danger @click="destroyGroup(record)">删除</a-button>
+            <a-button size="small" type="link" @click="openPending(record)">{{ t('stream.pending') }}</a-button>
+            <a-button size="small" type="link" danger @click="destroyGroup(record)">{{ t('common.delete') }}</a-button>
           </template>
         </template>
         <template #expandedRowRender="{ record }">
@@ -398,18 +401,18 @@ function idleText(ms: number): string {
                 </a-button>
               </template>
             </template>
-            <template #emptyText>暂无消费者（消费者首次 XREADGROUP 后出现）</template>
+            <template #emptyText>{{ t('stream.noConsumers') }}</template>
           </a-table>
         </template>
       </a-table>
 
       <!-- 待确认二级抽屉 -->
-      <a-drawer v-model:open="pdVisible" :title="`待确认 · ${pdGroup}`" width="640">
+      <a-drawer v-model:open="pdVisible" :title="t('stream.pendingTitle', { group: pdGroup })" width="640">
         <div class="cg-toolbar">
           <a-button size="small" :loading="pdLoading" @click="loadPending">
             <template #icon><ReloadOutlined /></template>
           </a-button>
-          <span class="text-3" style="font-size: 11px">最多显示 200 条</span>
+          <span class="text-3" style="font-size: 11px">{{ t('stream.maxShown', { n: 200 }) }}</span>
         </div>
         <a-table
           :columns="pendingColumns"
@@ -429,7 +432,7 @@ function idleText(ms: number): string {
               <span v-else>{{ record.deliveryCount }}</span>
             </template>
             <template v-else-if="column.key === 'ops'">
-              <a-tooltip title="ACK 确认">
+              <a-tooltip :title="t('stream.ackTooltip')">
                 <a-button size="small" type="text" @click="ack([record.id])">
                   <template #icon><CheckOutlined /></template>
                 </a-button>
@@ -443,25 +446,25 @@ function idleText(ms: number): string {
     <!-- 新建消费组 -->
     <a-modal
       v-model:open="cgVisible"
-      title="新建消费组"
+      :title="t('stream.createGroup')"
       width="440px"
       :confirm-loading="cgSaving"
-      ok-text="创建" cancel-text="取消"
+      :ok-text="t('common.create')" :cancel-text="t('common.cancel')"
       @ok="createGroup"
     >
       <a-form layout="vertical" size="small">
-        <a-form-item label="组名" required>
-          <a-input v-model:value="cgName" placeholder="如 order-workers" class="mono" />
+        <a-form-item :label="t('stream.groupName')" required>
+          <a-input v-model:value="cgName" :placeholder="t('stream.groupNamePlaceholder')" class="mono" />
         </a-form-item>
-        <a-form-item label="起始位置">
+        <a-form-item :label="t('stream.startPosition')">
           <a-radio-group v-model:value="cgStart">
-            <a-radio value="new">仅新消息（$）</a-radio>
-            <a-radio value="all">从头（0）</a-radio>
-            <a-radio value="custom">指定 ID</a-radio>
+            <a-radio value="new">{{ t('stream.startNew') }}</a-radio>
+            <a-radio value="all">{{ t('stream.startFromBeginning') }}</a-radio>
+            <a-radio value="custom">{{ t('stream.startCustomId') }}</a-radio>
           </a-radio-group>
         </a-form-item>
-        <a-form-item v-if="cgStart === 'custom'" label="起始消息 ID">
-          <a-input v-model:value="cgCustomId" placeholder="如 1697000000000-0" class="mono" />
+        <a-form-item v-if="cgStart === 'custom'" :label="t('stream.startMessageId')">
+          <a-input v-model:value="cgCustomId" :placeholder="t('stream.startIdPlaceholder')" class="mono" />
         </a-form-item>
       </a-form>
     </a-modal>

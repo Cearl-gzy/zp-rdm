@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { ClusterInfo, ClusterNodes, KeySlot } from '../../wailsjs/go/service/ServerService'
@@ -7,6 +8,7 @@ import type { ClusterNode } from '../types'
 
 // Redis Cluster 集群视图：集群状态卡片 + 节点/槽位表 + 键槽查询
 const props = defineProps<{ connId: string }>()
+const { t } = useI18n()
 
 const info = ref<Record<string, string>>({})
 const nodes = ref<ClusterNode[]>([])
@@ -30,13 +32,13 @@ async function load() {
 
 onMounted(load)
 
-const nodeColumns = [
-  { title: '节点地址', dataIndex: 'addr', key: 'addr', width: 200 },
-  { title: '角色', dataIndex: 'role', key: 'role', width: 90 },
-  { title: '槽位', key: 'slots' },
-  { title: '槽数', dataIndex: 'slotCount', key: 'slotCount', width: 80 },
-  { title: '链路', dataIndex: 'linkState', key: 'linkState', width: 90 },
-]
+const nodeColumns = computed(() => [
+  { title: t('cluster.colAddr'), dataIndex: 'addr', key: 'addr', width: 200 },
+  { title: t('cluster.colRole'), dataIndex: 'role', key: 'role', width: 90 },
+  { title: t('cluster.colSlots'), key: 'slots' },
+  { title: t('cluster.colSlotCount'), dataIndex: 'slotCount', key: 'slotCount', width: 80 },
+  { title: t('cluster.colLink'), dataIndex: 'linkState', key: 'linkState', width: 90 },
+])
 
 // 键槽查询
 const slotKey = ref('')
@@ -62,13 +64,13 @@ async function querySlot() {
     <div class="cp-toolbar">
       <a-button size="small" :loading="loading" @click="load">
         <template #icon><ReloadOutlined /></template>
-        刷新
+        {{ t('common.refresh') }}
       </a-button>
       <div class="cp-slot-query">
         <a-input
           v-model:value="slotKey"
           size="small"
-          placeholder="输入键名查询哈希槽"
+          :placeholder="t('cluster.slotPlaceholder')"
           class="mono"
           style="width: 240px"
           @press-enter="querySlot"
@@ -84,21 +86,21 @@ async function querySlot() {
 
     <div class="cp-cards">
       <div class="cp-card">
-        <div class="cp-card-label">集群状态</div>
+        <div class="cp-card-label">{{ t('cluster.cardState') }}</div>
         <div class="cp-card-value" :class="info.cluster_state === 'ok' ? 'ok' : 'bad'">
           {{ info.cluster_state || '-' }}
         </div>
       </div>
       <div class="cp-card">
-        <div class="cp-card-label">已分配槽位</div>
+        <div class="cp-card-label">{{ t('cluster.cardSlotsAssigned') }}</div>
         <div class="cp-card-value num">{{ info.cluster_slots_assigned || '-' }}<span class="cp-dim"> / 16384</span></div>
       </div>
       <div class="cp-card">
-        <div class="cp-card-label">已知节点</div>
+        <div class="cp-card-label">{{ t('cluster.cardKnownNodes') }}</div>
         <div class="cp-card-value num">{{ info.cluster_known_nodes || '-' }}</div>
       </div>
       <div class="cp-card">
-        <div class="cp-card-label">集群规模（主节点）</div>
+        <div class="cp-card-label">{{ t('cluster.cardSize') }}</div>
         <div class="cp-card-value num">{{ info.cluster_size || '-' }}</div>
       </div>
     </div>
@@ -116,12 +118,12 @@ async function querySlot() {
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'addr'">
             <span class="mono cp-addr">{{ record.addr }}</span>
-            <a-tag v-if="record.myself" color="green" class="cp-tag">当前</a-tag>
+            <a-tag v-if="record.myself" color="green" class="cp-tag">{{ t('cluster.tagCurrent') }}</a-tag>
             <div class="cp-node-id mono">{{ record.id.slice(0, 12) }}…</div>
           </template>
           <template v-else-if="column.key === 'role'">
             <a-tag :color="record.role === 'master' ? 'blue' : 'default'" class="cp-tag">
-              {{ record.role === 'master' ? '主' : '从' }}
+              {{ record.role === 'master' ? t('cluster.roleMaster') : t('cluster.roleSlave') }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'slots'">

@@ -1,18 +1,21 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useConnectionStore } from '../stores/connection'
 import { message } from 'ant-design-vue'
+import { useI18n } from 'vue-i18n'
 import {
   DatabaseOutlined, ThunderboltOutlined, SafetyOutlined, CodeOutlined, ArrowRightOutlined,
 } from '@ant-design/icons-vue'
 
 const conn = useConnectionStore()
+const { t } = useI18n()
 
-const features = [
-  { icon: DatabaseOutlined, title: '全数据类型', desc: 'String / Hash / List / Set / ZSet / Stream 可视化编辑' },
-  { icon: ThunderboltOutlined, title: '实时监控', desc: 'INFO 仪表盘、OPS 趋势、慢日志、客户端管理' },
-  { icon: SafetyOutlined, title: '安全连接', desc: 'ACL 认证、TLS 加密、SSH 隧道' },
-  { icon: CodeOutlined, title: 'CLI 终端', desc: '任意 Redis 命令，历史记录与格式化输出' },
-]
+const features = computed(() => [
+  { icon: DatabaseOutlined, title: t('welcome.featureAllTypes'), desc: t('welcome.featureAllTypesDesc') },
+  { icon: ThunderboltOutlined, title: t('welcome.featureMonitor'), desc: t('welcome.featureMonitorDesc') },
+  { icon: SafetyOutlined, title: t('welcome.featureSecurity'), desc: t('welcome.featureSecurityDesc') },
+  { icon: CodeOutlined, title: t('welcome.featureCli'), desc: t('welcome.featureCliDesc') },
+])
 
 async function quickOpen(id: string) {
   try {
@@ -30,12 +33,12 @@ async function quickOpen(id: string) {
         <div class="hero-logo">ZP</div>
         <div class="hero-text">
           <h1 class="hero-title">ZP Redis Manager</h1>
-          <p class="hero-sub">轻量、精美、功能完善的 Redis 桌面管理工具</p>
+          <p class="hero-sub">{{ t('welcome.subtitle') }}</p>
         </div>
       </div>
 
       <div v-if="conn.profiles.length" class="quick-block">
-        <div class="block-label">快速连接</div>
+        <div class="block-label">{{ t('welcome.quickConnect') }}</div>
         <div class="quick-list">
           <div
             v-for="p in conn.profiles.slice(0, 5)"
@@ -53,8 +56,8 @@ async function quickOpen(id: string) {
         </div>
       </div>
       <div v-else class="quick-block">
-        <div class="block-label">开始使用</div>
-        <div class="start-hint">在左侧点击「新建」创建你的第一个 Redis 连接</div>
+        <div class="block-label">{{ t('welcome.getStarted') }}</div>
+        <div class="start-hint">{{ t('welcome.startHint') }}</div>
       </div>
 
       <div class="feature-grid">

@@ -8,6 +8,7 @@ import {
 import { useAppStore } from '../stores/app'
 import { useConnectionStore } from '../stores/connection'
 import { emitAppEvent, AppEvents } from '../utils/events'
+import { useI18n } from 'vue-i18n'
 
 interface PaletteItem {
   id: string
@@ -21,6 +22,7 @@ interface PaletteItem {
 
 const app = useAppStore()
 const conn = useConnectionStore()
+const { t } = useI18n()
 
 const keyword = ref('')
 const activeIndex = ref(0)
@@ -52,9 +54,9 @@ const allItems = computed<PaletteItem[]>(() => {
     const prof = conn.profiles.find(p => p.id === tab.id)
     items.push({
       id: `tab:${tab.id}`,
-      group: '切换标签',
+      group: t('palette.groupSwitchTab'),
       title: tab.state.name,
-      sub: prof ? `${prof.host}:${prof.port} · 已打开` : '已打开',
+      sub: prof ? `${prof.host}:${prof.port} · ${t('palette.opened')}` : t('palette.opened'),
       icon: LinkOutlined,
       run: () => { conn.activeTab = tab.id },
     })
@@ -63,7 +65,7 @@ const allItems = computed<PaletteItem[]>(() => {
     if (conn.openIds.has(p.id)) continue
     items.push({
       id: `conn:${p.id}`,
-      group: '打开连接',
+      group: t('palette.groupOpenConn'),
       title: p.name || `${p.host}:${p.port}`,
       sub: `${p.host}:${p.port}${p.ssh?.enabled ? ' · ssh' : ''}`,
       icon: DatabaseOutlined,
@@ -74,14 +76,14 @@ const allItems = computed<PaletteItem[]>(() => {
   }
 
   const actions: PaletteItem[] = [
-    { id: 'act:new', group: '操作', title: '新建连接', icon: PlusOutlined, kbd: 'Ctrl N', run: () => emitAppEvent(AppEvents.NewConnection) },
-    { id: 'act:import', group: '操作', title: '导入连接', icon: ImportOutlined, run: () => emitAppEvent(AppEvents.ImportConnections) },
-    { id: 'act:export', group: '操作', title: '导出连接', icon: ExportOutlined, run: () => emitAppEvent(AppEvents.ExportConnections) },
-    { id: 'act:theme', group: '操作', title: app.dark ? '切换为浅色主题' : '切换为深色主题', icon: SwapOutlined, run: () => app.toggleTheme() },
+    { id: 'act:new', group: t('palette.groupActions'), title: t('palette.newConnection'), icon: PlusOutlined, kbd: 'Ctrl N', run: () => emitAppEvent(AppEvents.NewConnection) },
+    { id: 'act:import', group: t('palette.groupActions'), title: t('palette.importConnections'), icon: ImportOutlined, run: () => emitAppEvent(AppEvents.ImportConnections) },
+    { id: 'act:export', group: t('palette.groupActions'), title: t('palette.exportConnections'), icon: ExportOutlined, run: () => emitAppEvent(AppEvents.ExportConnections) },
+    { id: 'act:theme', group: t('palette.groupActions'), title: app.dark ? t('palette.themeToLight') : t('palette.themeToDark'), icon: SwapOutlined, run: () => app.toggleTheme() },
   ]
   if (conn.activeTab) {
     actions.push({
-      id: 'act:close', group: '操作', title: '关闭当前标签', icon: CloseOutlined, kbd: 'Ctrl W',
+      id: 'act:close', group: t('palette.groupActions'), title: t('palette.closeTab'), icon: CloseOutlined, kbd: 'Ctrl W',
       run: () => { if (conn.activeTab) conn.close(conn.activeTab) },
     })
   }
@@ -186,7 +188,7 @@ function itemIndex(item: PaletteItem): number {
               ref="inputRef"
               v-model="keyword"
               class="cp-input"
-              placeholder="搜索连接、标签页或操作…"
+              :placeholder="t('palette.placeholder')"
               spellcheck="false"
               @keydown="onKeydown"
             />
@@ -212,13 +214,13 @@ function itemIndex(item: PaletteItem): number {
                 </div>
               </div>
             </template>
-            <div v-else class="cp-empty">没有匹配的结果</div>
+            <div v-else class="cp-empty">{{ t('palette.noResults') }}</div>
           </div>
 
           <div class="cp-footer">
-            <span class="cp-hint"><span class="kbd">↑↓</span> 导航</span>
-            <span class="cp-hint"><span class="kbd">↵</span> 执行</span>
-            <span class="cp-hint"><span class="kbd">esc</span> 关闭</span>
+            <span class="cp-hint"><span class="kbd">↑↓</span> {{ t('palette.navigate') }}</span>
+            <span class="cp-hint"><span class="kbd">↵</span> {{ t('palette.execute') }}</span>
+            <span class="cp-hint"><span class="kbd">esc</span> {{ t('palette.close') }}</span>
           </div>
         </div>
       </div>

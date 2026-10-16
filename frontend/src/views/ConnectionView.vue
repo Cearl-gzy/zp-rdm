@@ -16,11 +16,13 @@ import {
   DatabaseOutlined, DashboardOutlined, CodeOutlined,
   HistoryOutlined, NotificationOutlined, PieChartOutlined, SearchOutlined, ClusterOutlined,
 } from '@ant-design/icons-vue'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{ connId: string; state: ConnState }>()
 
 const conn = useConnectionStore()
 const app = useAppStore()
+const { t } = useI18n()
 
 // RediSearch 模块加载时才提供搜索视图
 const hasSearch = computed(() => (props.state.modules ?? []).some(m => /search/i.test(m)))
@@ -62,28 +64,28 @@ const dbOptions = computed(() =>
       <div class="vh-left">
         <a-segmented v-model:value="activeView" size="small">
           <a-segmented-option value="data">
-            <span class="seg-item"><DatabaseOutlined /> 数据</span>
+            <span class="seg-item"><DatabaseOutlined /> {{ t('connectionView.data') }}</span>
           </a-segmented-option>
           <a-segmented-option value="analysis">
-            <span class="seg-item"><PieChartOutlined /> 分析</span>
+            <span class="seg-item"><PieChartOutlined /> {{ t('connectionView.analysis') }}</span>
           </a-segmented-option>
           <a-segmented-option v-if="isCluster" value="cluster">
-            <span class="seg-item"><ClusterOutlined /> 集群</span>
+            <span class="seg-item"><ClusterOutlined /> {{ t('connectionView.cluster') }}</span>
           </a-segmented-option>
           <a-segmented-option value="info">
-            <span class="seg-item"><DashboardOutlined /> 监控</span>
+            <span class="seg-item"><DashboardOutlined /> {{ t('connectionView.monitor') }}</span>
           </a-segmented-option>
           <a-segmented-option value="cli">
             <span class="seg-item"><CodeOutlined /> CLI</span>
           </a-segmented-option>
           <a-segmented-option value="slowlog">
-            <span class="seg-item"><HistoryOutlined /> 慢日志</span>
+            <span class="seg-item"><HistoryOutlined /> {{ t('connectionView.slowlog') }}</span>
           </a-segmented-option>
           <a-segmented-option value="pubsub">
-            <span class="seg-item"><NotificationOutlined /> 发布订阅</span>
+            <span class="seg-item"><NotificationOutlined /> {{ t('connectionView.pubsub') }}</span>
           </a-segmented-option>
           <a-segmented-option v-if="hasSearch" value="search">
-            <span class="seg-item"><SearchOutlined /> 搜索</span>
+            <span class="seg-item"><SearchOutlined /> {{ t('connectionView.search') }}</span>
           </a-segmented-option>
         </a-segmented>
       </div>
@@ -92,7 +94,7 @@ const dbOptions = computed(() =>
         <span class="meta-pill">{{ state.mode }}</span>
         <template v-if="!isCluster">
           <span class="vh-divider" />
-          <span class="text-3" style="font-size: 11.5px">数据库</span>
+          <span class="text-3" style="font-size: 11.5px">{{ t('connectionView.database') }}</span>
           <a-select
             v-model:value="db"
             :options="dbOptions"
