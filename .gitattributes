@@ -1,0 +1,4 @@
+# PEM 测试证书与 shell 脚本必须保持 LF（WSL redis/openssl 读取）
+*.crt text eol=lf
+*.key text eol=lf
+*.sh text eol=lf
