@@ -34,7 +34,8 @@ func newTemp(t *testing.T) (*Store, string) {
 func profile(id string) model.ConnectionProfile {
 	return model.ConnectionProfile{
 		ID: id, Name: "test-" + id, Host: "127.0.0.1", Port: 6379,
-		Password: "top-secret-" + id,
+		Password:     "top-secret-" + id,
+		TLSClientKey: "tls-key-" + id,
 		SSH: model.SSHConfig{
 			Enabled: true, Host: "jump", Username: "ubuntu",
 			Password: "ssh-pass-" + id, PrivateKey: "ssh-key-" + id, Passphrase: "ssh-phrase-" + id,
@@ -53,11 +54,11 @@ func TestDiskEncryption(t *testing.T) {
 	}
 	content := string(b)
 	if encryptionActive {
-		// 磁盘上必须是平台前缀密文，且四个敏感字段的明文都不可见
+		// 磁盘上必须是平台前缀密文，且全部敏感字段的明文都不可见
 		if !strings.Contains(content, cipherPrefix()) {
 			t.Fatalf("no %s ciphertext found on disk", cipherPrefix())
 		}
-		for _, plain := range []string{"top-secret-c1", "ssh-pass-c1", "ssh-key-c1", "ssh-phrase-c1"} {
+		for _, plain := range []string{"top-secret-c1", "ssh-pass-c1", "ssh-key-c1", "ssh-phrase-c1", "tls-key-c1"} {
 			if strings.Contains(content, plain) {
 				t.Fatalf("plaintext %q leaked to disk", plain)
 			}
@@ -71,7 +72,8 @@ func TestDiskEncryption(t *testing.T) {
 		t.Fatal("profile not found in memory")
 	}
 	if got.Password != "top-secret-c1" || got.SSH.Password != "ssh-pass-c1" ||
-		got.SSH.PrivateKey != "ssh-key-c1" || got.SSH.Passphrase != "ssh-phrase-c1" {
+		got.SSH.PrivateKey != "ssh-key-c1" || got.SSH.Passphrase != "ssh-phrase-c1" ||
+		got.TLSClientKey != "tls-key-c1" {
 		t.Fatalf("in-memory values not plaintext: %+v", got)
 	}
 }
@@ -93,6 +95,9 @@ func TestLoadDecrypts(t *testing.T) {
 	}
 	if got.SSH.PrivateKey != "ssh-key-c1" {
 		t.Fatalf("ssh key after reload = %q", got.SSH.PrivateKey)
+	}
+	if got.TLSClientKey != "tls-key-c1" {
+		t.Fatalf("tls client key after reload = %q", got.TLSClientKey)
 	}
 }
 

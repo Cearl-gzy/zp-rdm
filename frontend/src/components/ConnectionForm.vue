@@ -16,7 +16,9 @@ const COLORS = ['#e04536', '#f5a623', '#3fbf6b', '#3b82f6', '#a855f7', '#14b8a6'
 function emptyProfile(): ConnectionProfile {
   return {
     id: '', name: '', group: '', host: '127.0.0.1', port: 6379,
-    username: '', password: '', useTls: false, db: 0, color: COLORS[0],
+    username: '', password: '', useTls: false,
+    tlsSkipVerify: true, tlsCaCert: '', tlsClientCert: '', tlsClientKey: '',
+    db: 0, color: COLORS[0],
     ssh: { enabled: false, host: '', port: 22, username: '', authType: 'password', password: '', privateKey: '', passphrase: '' },
   }
 }
@@ -28,6 +30,8 @@ watch(() => props.open, v => {
   if (v) {
     Object.assign(form, emptyProfile(), props.profile ? JSON.parse(JSON.stringify(props.profile)) : {})
     if (!form.ssh) form.ssh = emptyProfile().ssh
+    // 旧配置无该字段：保持历史行为（跳过证书校验）
+    if (form.tlsSkipVerify == null) form.tlsSkipVerify = true
     nextTick(() => nameInput.value?.focus())
   }
 })
@@ -122,8 +126,49 @@ async function onSave() {
             </a-form-item>
           </div>
           <a-form-item>
-            <a-checkbox v-model:checked="form.useTls">启用 TLS/SSL（跳过证书校验）</a-checkbox>
+            <a-checkbox v-model:checked="form.useTls">启用 TLS/SSL（详细选项见「TLS」页）</a-checkbox>
           </a-form-item>
+        </a-form>
+      </a-tab-pane>
+
+      <a-tab-pane key="tls" tab="TLS">
+        <a-form layout="vertical" size="small">
+          <a-form-item>
+            <a-switch v-model:checked="form.useTls" />
+            <span style="margin-left: 8px">启用 TLS/SSL 加密连接</span>
+          </a-form-item>
+          <template v-if="form.useTls">
+            <a-form-item>
+              <a-checkbox v-model:checked="form.tlsSkipVerify">
+                跳过服务端证书校验（自签证书场景；关闭后需可信 CA）
+              </a-checkbox>
+            </a-form-item>
+            <a-form-item label="自定义 CA 证书（PEM 内容，可空）">
+              <a-textarea
+                v-model:value="form.tlsCaCert"
+                :rows="4"
+                placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"
+                class="mono-input"
+              />
+            </a-form-item>
+            <a-divider style="margin: 8px 0 12px">双向认证（mTLS，可选）</a-divider>
+            <a-form-item label="客户端证书（PEM 内容）">
+              <a-textarea
+                v-model:value="form.tlsClientCert"
+                :rows="4"
+                placeholder="-----BEGIN CERTIFICATE-----&#10;…&#10;-----END CERTIFICATE-----"
+                class="mono-input"
+              />
+            </a-form-item>
+            <a-form-item label="客户端私钥（PEM 内容，加密落盘）">
+              <a-textarea
+                v-model:value="form.tlsClientKey"
+                :rows="4"
+                placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----"
+                class="mono-input"
+              />
+            </a-form-item>
+          </template>
         </a-form>
       </a-tab-pane>
 
@@ -191,5 +236,9 @@ async function onSave() {
 .color-swatch.selected {
   border-color: var(--text-1);
   box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 4px currentColor;
+}
+.mono-input :deep(textarea), .mono-input {
+  font-family: var(--mono, monospace);
+  font-size: 11.5px;
 }
 </style>

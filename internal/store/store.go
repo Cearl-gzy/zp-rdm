@@ -57,6 +57,7 @@ func protectProfile(p model.ConnectionProfile) model.ConnectionProfile {
 	p.SSH.Password = enc(p.SSH.Password)
 	p.SSH.PrivateKey = enc(p.SSH.PrivateKey)
 	p.SSH.Passphrase = enc(p.SSH.Passphrase)
+	p.TLSClientKey = enc(p.TLSClientKey)
 	return p
 }
 
@@ -77,6 +78,7 @@ func unprotectProfile(p *model.ConnectionProfile) bool {
 	p.SSH.Password = dec(p.SSH.Password)
 	p.SSH.PrivateKey = dec(p.SSH.PrivateKey)
 	p.SSH.Passphrase = dec(p.SSH.Passphrase)
+	p.TLSClientKey = dec(p.TLSClientKey)
 	return plain
 }
 

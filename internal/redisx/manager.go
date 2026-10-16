@@ -3,6 +3,7 @@ package redisx
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -139,9 +140,47 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 		}
 	}
 	if p.UseTLS {
-		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: true} //nolint:gosec
+		tc, err := buildTLSConfig(p)
+		if err != nil {
+			return nil, err
+		}
+		opts.TLSConfig = tc
 	}
 	return redis.NewClient(opts), nil
+}
+
+// buildTLSConfig 按连接配置构建 tls.Config。
+// 默认跳过证书校验（兼容旧行为）；提供自定义 CA 时可关闭跳过做严格校验；
+// 客户端证书/私钥同时提供时启用 mTLS。
+func buildTLSConfig(p model.ConnectionProfile) (*tls.Config, error) {
+	// TLSSkipVerify 为 nil 的旧配置视为跳过（历史行为就是 InsecureSkipVerify）
+	skip := p.TLSSkipVerify == nil || *p.TLSSkipVerify
+	tc := &tls.Config{
+		MinVersion:         tls.VersionTLS12,
+		InsecureSkipVerify: skip, //nolint:gosec 用户显式选择
+	}
+	if ca := strings.TrimSpace(p.TLSCaCert); ca != "" {
+		pool, err := x509.SystemCertPool()
+		if err != nil || pool == nil {
+			pool = x509.NewCertPool()
+		}
+		if !pool.AppendCertsFromPEM([]byte(ca)) {
+			return nil, errors.New("CA 证书 PEM 解析失败（未包含有效证书）")
+		}
+		tc.RootCAs = pool
+	}
+	cert, key := strings.TrimSpace(p.TLSClientCert), strings.TrimSpace(p.TLSClientKey)
+	if (cert == "") != (key == "") {
+		return nil, errors.New("mTLS 需要同时提供客户端证书与私钥")
+	}
+	if cert != "" {
+		pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
+		if err != nil {
+			return nil, fmt.Errorf("客户端证书/私钥解析失败: %w", err)
+		}
+		tc.Certificates = []tls.Certificate{pair}
+	}
+	return tc, nil
 }
 
 // parseModuleNames 解析 MODULE LIST 返回的模块名列表；命令失败（老版本/受限）时返回空切片

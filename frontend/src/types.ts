@@ -19,6 +19,10 @@ export interface ConnectionProfile {
   username: string
   password: string
   useTls: boolean
+  tlsSkipVerify?: boolean | null // 旧配置缺省视为 true（历史行为）
+  tlsCaCert: string // 自定义 CA 证书 PEM 内容
+  tlsClientCert: string // mTLS 客户端证书 PEM
+  tlsClientKey: string // mTLS 客户端私钥 PEM（加密落盘）
   db: number
   ssh: SSHConfig
   color: string
@@ -77,6 +81,16 @@ export interface HashItem { field: string; value: string }
 export interface ListItem { index: number; value: string }
 export interface ZSetItem { member: string; score: number }
 export interface StreamItem { id: string; fields: Record<string, string> }
+export interface StreamGroup {
+  name: string
+  consumers: number
+  pending: number
+  lastDeliveredId: string
+  entriesRead: number
+  lag: number
+}
+export interface StreamConsumer { name: string; pending: number; idleMs: number }
+export interface StreamPendingEntry { id: string; consumer: string; idleMs: number; deliveryCount: number }
 
 export interface ScanItems {
   cursor: number

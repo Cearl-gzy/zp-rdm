@@ -22,9 +22,14 @@ type ConnectionProfile struct {
 	Username string    `json:"username"`
 	Password string    `json:"password"`
 	UseTLS   bool      `json:"useTls"`
-	DB       int       `json:"db"`
-	SSH      SSHConfig `json:"ssh"`
-	Color    string    `json:"color"`
+	// TLSSkipVerify 跳过服务端证书校验；nil（旧配置）按 true 处理，保持历史行为
+	TLSSkipVerify *bool  `json:"tlsSkipVerify"`
+	TLSCaCert     string `json:"tlsCaCert"`     // 自定义 CA 证书 PEM 内容（可选）
+	TLSClientCert string `json:"tlsClientCert"` // mTLS 客户端证书 PEM（可选）
+	TLSClientKey  string `json:"tlsClientKey"`  // mTLS 客户端私钥 PEM（可选，敏感，加密落盘）
+	DB            int       `json:"db"`
+	SSH           SSHConfig `json:"ssh"`
+	Color         string    `json:"color"`
 }
 
 // ConnState 连接打开后的状态
@@ -146,6 +151,31 @@ type ScanItems struct {
 type StreamItem struct {
 	ID     string            `json:"id"`
 	Fields map[string]string `json:"fields"`
+}
+
+// StreamGroup stream 消费者组概览（XINFO GROUPS）
+type StreamGroup struct {
+	Name            string `json:"name"`
+	Consumers       int64  `json:"consumers"`
+	Pending         int64  `json:"pending"`
+	LastDeliveredID string `json:"lastDeliveredId"`
+	EntriesRead     int64  `json:"entriesRead"`
+	Lag             int64  `json:"lag"`
+}
+
+// StreamConsumer 组内消费者（XINFO CONSUMERS）
+type StreamConsumer struct {
+	Name    string `json:"name"`
+	Pending int64  `json:"pending"`
+	IdleMs  int64  `json:"idleMs"`
+}
+
+// StreamPendingEntry 待确认（pending）条目
+type StreamPendingEntry struct {
+	ID            string `json:"id"`
+	Consumer      string `json:"consumer"`
+	IdleMs        int64  `json:"idleMs"`
+	DeliveryCount int64  `json:"deliveryCount"`
 }
 
 // SlowLogEntry 慢日志条目

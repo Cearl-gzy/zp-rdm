@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.6.0-red)
+![version](https://img.shields.io/badge/version-1.7.0-red)
 
 ---
 
@@ -48,7 +48,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
-| 工程化 | 全平台密码加密、工作区会话恢复、SSH 隧道、命令面板、自动更新 |
+| 工程化 | 全平台密码加密、TLS/mTLS 连接、工作区会话恢复、SSH 隧道、命令面板、自动更新 |
 
 ---
 
@@ -57,7 +57,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 ### 🌳 数据浏览
 
 - **键树虚拟滚动** — 十万级键无压力。按分隔符（`:` `/` `.` `_` `-`）自动聚合成目录树，目录显示键数统计；树/列表双视图一键切换
-- **全类型编辑器** — String / Hash / List / Set / ZSet / Stream 均有专属编辑器，支持字段级增删改、内联编辑
+- **全类型编辑器** — String / Hash / List / Set / ZSet / Stream 均有专属编辑器，支持字段级增删改、内联编辑；Stream 额外支持**消费者组管理**（组/消费者增删、pending 待确认列表、逐条 ACK）
 - **CodeMirror 编辑器** — String 值支持 JSON 语法高亮、格式化、压缩
 - **二进制自动检测** — 含不可见字符的值自动切 Hex 视图，十六进制直接编辑，乱码不再困扰
 - **大值懒加载** — 超过 1MB 的 String 默认只加载前 1MB 预览，一键加载全量，避免界面卡死
@@ -107,6 +107,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 ### 🔐 安全与工程化
 
 - **全平台密码加密** — 连接密码、SSH 私钥/密码/口令加密落盘（用户+机器绑定，拷走配置文件也解不开）：Windows DPAPI / macOS 钥匙串 / Linux Secret Service（AES-256-GCM 自包含密文，主密钥存系统密钥环）；旧版明文配置启动时自动迁移
+- **TLS/SSL 连接** — 支持跳过校验（自签场景）、自定义 CA 证书严格校验、双向认证（mTLS 客户端证书/私钥），私钥随敏感字段加密落盘
 - **SSH 隧道** — 连接支持 SSH 跳板（密码/私钥/口令三种认证）
 - **工作区会话恢复** — 重启后自动恢复：打开的连接标签、激活标签、每连接的视图（数据/监控/CLI…）、选中的键、匹配模式、树/列表视图、键分隔符、上次使用的 DB
 - **窗口状态记忆** — 尺寸、位置、最大化状态、侧栏宽度（可拖拽 160–480px）、深浅主题全部持久化
@@ -162,7 +163,7 @@ push 一个 `v*` tag 即触发 GitHub Actions：全量测试 → 三平台并行
 ## 数据与安全
 
 - 配置目录：Windows `%AppData%/zp-rdm/`，macOS/Linux `~/.config/zp-rdm/`（`connections.json` + `settings.json`）
-- 连接密码、SSH 私钥/密码/口令：全平台加密落盘（Windows **DPAPI** / macOS 钥匙串 / Linux Secret Service，主密钥不可用时回退 0600 密钥文件），内存中保持明文
+- 连接密码、SSH 私钥/密码/口令、TLS 客户端私钥：全平台加密落盘（Windows **DPAPI** / macOS 钥匙串 / Linux Secret Service，主密钥不可用时回退 0600 密钥文件），内存中保持明文
 - 旧版明文配置启动时自动迁移为密文
 - ⚠️ 连接**导出文件为明文**（可移植性设计），请妥善保管导出文件
 - ⚠️ CLI 命令历史以明文保存在 `settings.json`，包含执行过的完整命令

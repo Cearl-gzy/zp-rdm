@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusCircleOutlined } from '@ant-design/icons-vue'
-import { StreamGet, StreamAdd, StreamDel } from '../../../wailsjs/go/service/ValueService'
-import type { StreamItem, ScanItems } from '../../types'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusCircleOutlined, TeamOutlined, CheckOutlined } from '@ant-design/icons-vue'
+import { StreamGet, StreamAdd, StreamDel, StreamGroups, StreamConsumers, StreamPending, StreamAck, StreamGroupCreate, StreamGroupDestroy, StreamConsumerDelete } from '../../../wailsjs/go/service/ValueService'
+import type { StreamItem, ScanItems, StreamGroup, StreamConsumer, StreamPendingEntry } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
 
@@ -90,6 +90,184 @@ const columns = [
   { title: '字段', key: 'fields' },
   { title: '操作', key: 'ops', width: 70 },
 ]
+
+// ---------- 消费者组 ----------
+
+const groupsVisible = ref(false)
+const groups = ref<StreamGroup[]>([])
+const groupsLoading = ref(false)
+
+function openGroups() {
+  groupsVisible.value = true
+  loadGroups()
+}
+
+async function loadGroups() {
+  groupsLoading.value = true
+  try {
+    groups.value = (await StreamGroups(props.connId, props.db, props.keyName)) as unknown as StreamGroup[] || []
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    groupsLoading.value = false
+  }
+}
+
+const groupColumns = [
+  { title: '组名', dataIndex: 'name', key: 'name' },
+  { title: '消费者', dataIndex: 'consumers', key: 'consumers', width: 70 },
+  { title: '待确认', dataIndex: 'pending', key: 'pending', width: 70 },
+  { title: '未交付', dataIndex: 'lag', key: 'lag', width: 70 },
+  { title: '最后交付 ID', dataIndex: 'lastDeliveredId', key: 'lastDeliveredId', width: 150 },
+  { title: '操作', key: 'ops', width: 150 },
+]
+
+// 展开组 → 加载消费者
+const consumersByGroup = ref<Record<string, StreamConsumer[]>>({})
+const consumersLoading = ref<Record<string, boolean>>({})
+
+async function onGroupExpand(expanded: boolean, record: StreamGroup) {
+  if (!expanded) return
+  consumersLoading.value = { ...consumersLoading.value, [record.name]: true }
+  try {
+    const cs = (await StreamConsumers(props.connId, props.db, props.keyName, record.name)) as unknown as StreamConsumer[]
+    consumersByGroup.value = { ...consumersByGroup.value, [record.name]: cs || [] }
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    consumersLoading.value = { ...consumersLoading.value, [record.name]: false }
+  }
+}
+
+function removeConsumer(group: string, name: string) {
+  Modal.confirm({
+    title: '删除消费者',
+    content: `确定删除消费者 ${name} 吗？其待确认记录将被清除（消息保留在 stream 中）。`,
+    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    async onOk() {
+      try {
+        const n = await StreamConsumerDelete(props.connId, props.db, props.keyName, group, name)
+        message.success(`已删除，清除 ${n} 条待确认`)
+        onGroupExpand(true, { name: group } as StreamGroup)
+        loadGroups()
+      } catch (e: any) {
+        message.error(String(e?.message ?? e))
+      }
+    },
+  })
+}
+
+const consumerColumns = [
+  { title: '消费者', dataIndex: 'name', key: 'name' },
+  { title: '待确认', dataIndex: 'pending', key: 'pending', width: 80 },
+  { title: '空闲', dataIndex: 'idleMs', key: 'idleMs', width: 100 },
+  { title: '操作', key: 'ops', width: 60 },
+]
+
+// 新建组
+const cgVisible = ref(false)
+const cgName = ref('')
+const cgStart = ref<'new' | 'all' | 'custom'>('new')
+const cgCustomId = ref('')
+const cgSaving = ref(false)
+
+function openCreateGroup() {
+  cgName.value = ''
+  cgStart.value = 'new'
+  cgCustomId.value = ''
+  cgVisible.value = true
+}
+
+async function createGroup() {
+  if (!cgName.value.trim()) { message.warning('请填写组名'); return }
+  let startID = '$'
+  if (cgStart.value === 'all') startID = '0'
+  else if (cgStart.value === 'custom') {
+    startID = cgCustomId.value.trim()
+    if (!startID) { message.warning('请填写起始 ID'); return }
+  }
+  cgSaving.value = true
+  try {
+    await StreamGroupCreate(props.connId, props.db, props.keyName, cgName.value.trim(), startID, false)
+    message.success('已创建')
+    cgVisible.value = false
+    loadGroups()
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    cgSaving.value = false
+  }
+}
+
+function destroyGroup(g: StreamGroup) {
+  Modal.confirm({
+    title: '删除消费者组',
+    content: `确定删除组 ${g.name} 吗？组内待确认状态将丢失（消息保留在 stream 中）。`,
+    okText: '删除', okButtonProps: { danger: true }, cancelText: '取消',
+    async onOk() {
+      try {
+        await StreamGroupDestroy(props.connId, props.db, props.keyName, g.name)
+        message.success('已删除')
+        loadGroups()
+      } catch (e: any) {
+        message.error(String(e?.message ?? e))
+      }
+    },
+  })
+}
+
+// 待确认（pending）
+const pdVisible = ref(false)
+const pdGroup = ref('')
+const pdItems = ref<StreamPendingEntry[]>([])
+const pdLoading = ref(false)
+
+async function openPending(g: StreamGroup) {
+  pdGroup.value = g.name
+  pdVisible.value = true
+  loadPending()
+}
+
+async function loadPending() {
+  pdLoading.value = true
+  try {
+    pdItems.value = (await StreamPending(props.connId, props.db, props.keyName, pdGroup.value, 200)) as unknown as StreamPendingEntry[] || []
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    pdLoading.value = false
+  }
+}
+
+async function ack(ids: string[]) {
+  try {
+    const n = await StreamAck(props.connId, props.db, props.keyName, pdGroup.value, ids)
+    message.success(`已确认 ${n} 条`)
+    loadPending()
+    loadGroups()
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  }
+}
+
+const pendingColumns = [
+  { title: '消息 ID', dataIndex: 'id', key: 'id', width: 170 },
+  { title: '消费者', dataIndex: 'consumer', key: 'consumer' },
+  { title: '空闲', dataIndex: 'idleMs', key: 'idleMs', width: 90 },
+  { title: '投递次数', dataIndex: 'deliveryCount', key: 'deliveryCount', width: 80 },
+  { title: '操作', key: 'ops', width: 70 },
+]
+
+function idleText(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m${s % 60}s`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h${m % 60}m`
+  return `${Math.floor(h / 24)}d${h % 24}h`
+}
 </script>
 
 <template>
@@ -113,6 +291,10 @@ const columns = [
       <a-button size="small" type="primary" @click="openAdd">
         <template #icon><PlusOutlined /></template>
         添加条目
+      </a-button>
+      <a-button size="small" @click="openGroups">
+        <template #icon><TeamOutlined /></template>
+        消费者组
       </a-button>
       <span class="text-3" style="font-size: 11px; margin-left: auto">共 {{ total }} 条目</span>
     </div>
@@ -161,6 +343,128 @@ const columns = [
         添加字段
       </a-button>
     </a-modal>
+
+    <!-- 消费者组管理抽屉 -->
+    <a-drawer v-model:open="groupsVisible" title="消费者组" width="760">
+      <div class="cg-toolbar">
+        <a-button size="small" :loading="groupsLoading" @click="loadGroups">
+          <template #icon><ReloadOutlined /></template>
+        </a-button>
+        <a-button size="small" type="primary" @click="openCreateGroup">
+          <template #icon><PlusOutlined /></template>
+          新建消费组
+        </a-button>
+      </div>
+      <a-table
+        :columns="groupColumns"
+        :data-source="groups"
+        :pagination="false"
+        size="small"
+        row-key="name"
+        :loading="groupsLoading"
+        @expand="onGroupExpand"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'name'">
+            <span class="mono" style="color: var(--accent)">{{ record.name }}</span>
+          </template>
+          <template v-else-if="column.key === 'pending'">
+            <a-tag v-if="record.pending > 0" color="warning" class="cg-tag">{{ record.pending }}</a-tag>
+            <span v-else class="text-3">0</span>
+          </template>
+          <template v-else-if="column.key === 'lastDeliveredId'">
+            <span class="mono" style="font-size: 11px">{{ record.lastDeliveredId }}</span>
+          </template>
+          <template v-else-if="column.key === 'ops'">
+            <a-button size="small" type="link" @click="openPending(record)">待确认</a-button>
+            <a-button size="small" type="link" danger @click="destroyGroup(record)">删除</a-button>
+          </template>
+        </template>
+        <template #expandedRowRender="{ record }">
+          <a-table
+            :columns="consumerColumns"
+            :data-source="consumersByGroup[record.name] || []"
+            :pagination="false"
+            size="small"
+            row-key="name"
+            :loading="consumersLoading[record.name]"
+            class="cg-sub-table"
+          >
+            <template #bodyCell="{ column, record: c }">
+              <template v-if="column.key === 'idleMs'">{{ idleText(c.idleMs) }}</template>
+              <template v-else-if="column.key === 'ops'">
+                <a-button size="small" type="text" danger @click="removeConsumer(record.name, c.name)">
+                  <template #icon><DeleteOutlined /></template>
+                </a-button>
+              </template>
+            </template>
+            <template #emptyText>暂无消费者（消费者首次 XREADGROUP 后出现）</template>
+          </a-table>
+        </template>
+      </a-table>
+
+      <!-- 待确认二级抽屉 -->
+      <a-drawer v-model:open="pdVisible" :title="`待确认 · ${pdGroup}`" width="640">
+        <div class="cg-toolbar">
+          <a-button size="small" :loading="pdLoading" @click="loadPending">
+            <template #icon><ReloadOutlined /></template>
+          </a-button>
+          <span class="text-3" style="font-size: 11px">最多显示 200 条</span>
+        </div>
+        <a-table
+          :columns="pendingColumns"
+          :data-source="pdItems"
+          :pagination="false"
+          size="small"
+          row-key="id"
+          :loading="pdLoading"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'id'">
+              <span class="mono" style="font-size: 11px; color: #f472b6">{{ record.id }}</span>
+            </template>
+            <template v-else-if="column.key === 'idleMs'">{{ idleText(record.idleMs) }}</template>
+            <template v-else-if="column.key === 'deliveryCount'">
+              <a-tag v-if="record.deliveryCount > 1" color="error" class="cg-tag">{{ record.deliveryCount }}</a-tag>
+              <span v-else>{{ record.deliveryCount }}</span>
+            </template>
+            <template v-else-if="column.key === 'ops'">
+              <a-tooltip title="ACK 确认">
+                <a-button size="small" type="text" @click="ack([record.id])">
+                  <template #icon><CheckOutlined /></template>
+                </a-button>
+              </a-tooltip>
+            </template>
+          </template>
+        </a-table>
+      </a-drawer>
+    </a-drawer>
+
+    <!-- 新建消费组 -->
+    <a-modal
+      v-model:open="cgVisible"
+      title="新建消费组"
+      width="440px"
+      :confirm-loading="cgSaving"
+      ok-text="创建" cancel-text="取消"
+      @ok="createGroup"
+    >
+      <a-form layout="vertical" size="small">
+        <a-form-item label="组名" required>
+          <a-input v-model:value="cgName" placeholder="如 order-workers" class="mono" />
+        </a-form-item>
+        <a-form-item label="起始位置">
+          <a-radio-group v-model:value="cgStart">
+            <a-radio value="new">仅新消息（$）</a-radio>
+            <a-radio value="all">从头（0）</a-radio>
+            <a-radio value="custom">指定 ID</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item v-if="cgStart === 'custom'" label="起始消息 ID">
+          <a-input v-model:value="cgCustomId" placeholder="如 1697000000000-0" class="mono" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -174,4 +478,7 @@ const columns = [
 .pair-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
 .pair-key { width: 36%; }
 .pair-val { flex: 1; }
+.cg-toolbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.cg-tag { margin-inline-end: 0 !important; }
+.cg-sub-table { margin: 4px 0 4px 12px; }
 </style>
