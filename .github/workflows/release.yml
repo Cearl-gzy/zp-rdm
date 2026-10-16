@@ -146,14 +146,15 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
 
-      # Wails Linux 构建依赖 GTK3 + WebKit2GTK（ubuntu-latest 24.04 为 4.1）
+      # Wails Linux 构建依赖 GTK3 + WebKit2GTK（ubuntu-latest 24.04 只有 4.1）
       - name: Install native deps
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
+      # webkit2_41 tag：wails 默认找 webkit2gtk-4.0，24.04 无此包，必须用 4.1 绑定
       - name: Build binary
-        run: wails build -platform linux/amd64 -clean
+        run: wails build -platform linux/amd64 -clean -tags webkit2_41
 
       - name: Tar binary
         run: |
