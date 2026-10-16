@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.10.0-red)
+![version](https://img.shields.io/badge/version-1.11.0-red)
 
 ---
 
@@ -17,7 +17,27 @@
 |---|---|---|
 | Windows | `zp-rdm-amd64-installer.exe` | NSIS 安装包（推荐）；`zp-rdm.exe` 为便携版 |
 | macOS | `zp-rdm-darwin-universal.zip` | Universal 二进制（Intel + Apple Silicon） |
-| Linux | `zp-rdm-linux-amd64.tar.gz` | 需要 GTK3 + WebKit2GTK 运行时 |
+| Linux | `zp-rdm-linux-amd64.tar.gz` / `.deb` | 需要 GTK3 + WebKit2GTK 运行时 |
+
+也可以用包管理器安装：
+
+```powershell
+# Windows — winget
+winget install Cearl-gzy.zp-rdm
+
+# Windows — Scoop
+scoop bucket add zp-rdm https://github.com/Cearl-gzy/scoop-bucket
+scoop install zp-rdm
+```
+
+```bash
+# macOS — Homebrew
+brew tap Cearl-gzy/tap
+brew install --cask zp-rdm
+
+# Debian/Ubuntu — .deb
+sudo dpkg -i zp-rdm-linux-amd64.deb   # 依赖 libwebkit2gtk-4.1-0，缺失时 apt --fix-broken install
+```
 
 **macOS**：应用未签名，首次打开需绕过 Gatekeeper：
 
@@ -169,7 +189,9 @@ ZP_RDM_TEST_REDIS_ADDR=localhost:6379 go test ./...
 
 ## 发布
 
-push 一个 `v*` tag 即触发 GitHub Actions：全量测试 → 三平台并行构建（Windows NSIS + 便携 exe / macOS universal zip / Linux tar.gz）→ 自动创建 Release（含更新清单 `latest.json`，按平台匹配下载地址）。
+push 一个 `v*` tag 即触发 GitHub Actions：全量测试 → 三平台并行构建（Windows NSIS + 便携 exe / macOS universal zip / Linux tar.gz + .deb）→ 自动创建 Release（含更新清单 `latest.json`，按平台匹配下载地址）。
+
+Release 资产就绪后，跑一次 `scripts/update-channels.sh vX.Y.Z` 同步分发渠道：更新 [scoop-bucket](https://github.com/Cearl-gzy/scoop-bucket) 与 [homebrew-tap](https://github.com/Cearl-gzy/homebrew-tap) 的 manifest（自动算 sha256 并推送），并在 `packaging/winget/<version>/` 生成 winget-pkgs 清单（提交至 microsoft/winget-pkgs 的 `manifests/c/Cearl-gzy/zp-rdm/<version>/`）。
 
 > tag 版本号必须与 `wails.json` 的 `info.productVersion` 一致（CI 会校验，不一致直接失败）。
 

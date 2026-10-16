@@ -162,10 +162,23 @@ jobs:
           tar -czf build/bin/zp-rdm-linux-amd64.tar.gz -C build/bin zp-rdm
           ls -l build/bin/zp-rdm-linux-amd64.tar.gz
 
+      # .deb：nfpm 读取 packaging/nfpm.yaml，VERSION 环境变量注入版本号（自动剥 v 前缀）
+      - name: Package .deb
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+          nfpm package -f packaging/nfpm.yaml -p deb -t build/bin/
+          ls -l build/bin/*.deb
+          # 产物名固定，便于 release/latest.json 与更新脚本引用
+          mv build/bin/zp-rdm_*_amd64.deb build/bin/zp-rdm-linux-amd64.deb
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist-linux
-          path: build/bin/zp-rdm-linux-amd64.tar.gz
+          path: |
+            build/bin/zp-rdm-linux-amd64.tar.gz
+            build/bin/zp-rdm-linux-amd64.deb
           if-no-files-found: error
 
   release:

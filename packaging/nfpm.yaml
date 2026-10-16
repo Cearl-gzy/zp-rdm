@@ -1,0 +1,24 @@
+# nfpm 配置：CI 里打 .deb（VERSION 由 workflow 环境变量注入，nfpm 自动剥 v 前缀）
+name: zp-rdm
+arch: amd64
+platform: linux
+version: "${VERSION}"
+section: utils
+priority: optional
+maintainer: Cearl-gzy <https://github.com/Cearl-gzy>
+description: |
+  Lightweight, elegant Redis desktop manager.
+  Key tree browsing, full-type editors, key analysis, monitoring,
+  CLI, SSH tunnel, TLS/mTLS, Redis Cluster, RedisJSON & RediSearch.
+homepage: https://github.com/Cearl-gzy/zp-rdm
+license: MIT
+depends:
+  - libwebkit2gtk-4.1-0
+  - libgtk-3-0
+contents:
+  - src: build/bin/zp-rdm
+    dst: /usr/bin/zp-rdm
+  - src: packaging/zp-rdm.desktop
+    dst: /usr/share/applications/zp-rdm.desktop
+  - src: build/appicon.png
+    dst: /usr/share/icons/hicolor/1024x1024/apps/zp-rdm.png

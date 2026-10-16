@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=ZP Redis Manager
+Comment=Lightweight, elegant Redis desktop manager
+Exec=zp-rdm
+Icon=zp-rdm
+Terminal=false
+Type=Application
+Categories=Development;Database;
+Keywords=redis;database;gui;
+StartupNotify=true
