@@ -159,6 +159,75 @@ func TestJSONCreateKeyAndFull(t *testing.T) {
 	}
 }
 
+func TestJSONPathOps(t *testing.T) {
+	s, seed, connID := newJSONValueService(t)
+
+	jsonSet(t, seed, "doc:path", `{"user":{"name":"alice","tags":["a","b"]},"count":3}`)
+
+	// 读路径
+	v, err := s.GetJSONPath(connID, 0, "doc:path", "$.user.name")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != `"alice"` {
+		t.Errorf("$.user.name = %q", v)
+	}
+	v, err = s.GetJSONPath(connID, 0, "doc:path", "$.user.tags[1]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v != `"b"` {
+		t.Errorf("$.user.tags[1] = %q", v)
+	}
+
+	// 路径级写入（对象字段）
+	if err := s.SetJSONPath(connID, 0, "doc:path", "$.user.name", `"bob"`); err != nil {
+		t.Fatal(err)
+	}
+	v, _ = s.GetJSONPath(connID, 0, "doc:path", "$.user.name")
+	if v != `"bob"` {
+		t.Errorf("after set $.user.name = %q", v)
+	}
+
+	// 路径级写入（子树替换 + 新字段）
+	if err := s.SetJSONPath(connID, 0, "doc:path", "$.user.tags", `["x",1,true]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetJSONPath(connID, 0, "doc:path", "$.user.age", `30`); err != nil {
+		t.Fatal(err)
+	}
+	full, err := s.GetFullJSON(connID, 0, "doc:path")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"bob"`, `"x"`, `"age"`, `"count"`} {
+		if !strings.Contains(full, want) {
+			t.Errorf("full doc missing %s: %s", want, full)
+		}
+	}
+
+	// 非法 JSON 值应报错
+	if err := s.SetJSONPath(connID, 0, "doc:path", "$.x", `not-json`); err == nil {
+		t.Error("SetJSONPath 非法 JSON 应返回错误")
+	}
+	// 不存在路径读应报错
+	if _, err := s.GetJSONPath(connID, 0, "doc:path", "$.nope.deep"); err == nil {
+		t.Error("不存在路径应返回错误")
+	}
+
+	// JSON.SET 原地修改不影响 TTL
+	if err := seed.Do(tctx, "JSON.SET", "doc:ttl", "$", `{"a":1}`).Err(); err != nil {
+		t.Fatal(err)
+	}
+	seed.Expire(tctx, "doc:ttl", 100*time.Second) //nolint:errcheck
+	if err := s.SetJSONPath(connID, 0, "doc:ttl", "$.a", `2`); err != nil {
+		t.Fatal(err)
+	}
+	if ttl := seed.TTL(tctx, "doc:ttl").Val(); ttl <= 0 {
+		t.Errorf("SetJSONPath 后 TTL 丢失: %v", ttl)
+	}
+}
+
 func TestModulesDetected(t *testing.T) {
 	m, _, connID := newJSONFixture(t)
 

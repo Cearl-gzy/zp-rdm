@@ -140,12 +140,19 @@ watch(() => [props.db, props.connId], async () => {
 
 // F5 / Ctrl+R 刷新：仅当前激活标签页的浏览器响应
 let offRefresh: (() => void) | null = null
+// 搜索面板"打开键"：选中并展开定位（ConnectionView 负责切到数据视图）
+let offOpenKey: (() => void) | null = null
 onMounted(() => {
   offRefresh = onAppEvent(AppEvents.Refresh, () => {
     if (conn.activeTab === props.connId) refresh()
   })
+  offOpenKey = onAppEvent<{ connId: string; key: string }>(AppEvents.OpenKey, d => {
+    if (d?.connId !== props.connId || !d.key) return
+    selectedKey.value = d.key
+    expandToKey(d.key)
+  })
 })
-onBeforeUnmount(() => offRefresh?.())
+onBeforeUnmount(() => { offRefresh?.(); offOpenKey?.() })
 
 // ---------- 树虚拟滚动：容器高度自适应 ----------
 const contentRef = ref<HTMLElement>()

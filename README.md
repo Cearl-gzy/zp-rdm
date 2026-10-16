@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.5.1-red)
+![version](https://img.shields.io/badge/version-1.6.0-red)
 
 ---
 
@@ -34,7 +34,7 @@ sudo apt install libwebkit2gtk-4.1-0
 tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 ```
 
-> ⚠️ 跨平台说明：连接密码加密目前仅 Windows（DPAPI）；macOS/Linux 上密码为明文存储（配置文件权限 0600），系统密钥环支持计划中。
+> 🔐 跨平台加密：连接密码在三大平台均加密落盘——Windows DPAPI、macOS 钥匙串、Linux Secret Service（密钥环不可用时回退 0600 权限的本地密钥文件）。
 
 ---
 
@@ -42,12 +42,13 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 | 模块 | 能力 |
 |---|---|
-| 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载 |
+| 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载、批量 TTL/移动 DB |
 | 键分析 | TOP Keys、TTL 分布、前缀内存聚合 |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
-| 运维 | 慢日志、发布订阅、全命令 CLI、MONITOR 实时命令流 |
+| 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
+| 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
-| 工程化 | DPAPI 加密、工作区会话恢复、命令面板、自动更新 |
+| 工程化 | 全平台密码加密、工作区会话恢复、SSH 隧道、命令面板、自动更新 |
 
 ---
 
@@ -86,6 +87,11 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **危险命令护栏** — `FLUSHALL` / `FLUSHDB` / `SHUTDOWN` / `DEBUG` / `CONFIG SET` / `KEYS` 执行前弹确认框，防手滑
 - **MONITOR 模式** — 实时命令流监听（独立连接，不占用连接池），支持暂停、关键字过滤、500 行滚动缓冲，闪烁指示灯明确监听状态
 
+### 🧩 Redis 模块（Redis Stack）
+
+- **RedisJSON 编辑器** — `ReJSON-RL` 键自动识别：文本模式（语法高亮/格式化）+ 树形模式（结构浏览）；树节点悬停即可**路径级编辑**（`JSON.SET key $.path`，局部写入不动 TTL）；模块加载时新建键可选 json 类型
+- **RediSearch 查询面板** — 独立"搜索"视图：索引下拉（FT._LIST）+ schema 字段展示（名称/类型/JSONPath）+ 完整查询语法（`@field:value`、`@age:[18 30]`、`@city:{北京}`），结果分页直达数据视图
+
 ### 🐌 慢日志 & 发布订阅
 
 - **SLOWLOG** — 慢查询列表（耗时/命令/时间/客户端），阈值说明，一键清空
@@ -100,7 +106,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ### 🔐 安全与工程化
 
-- **DPAPI 密码加密**（Windows） — 连接密码、SSH 私钥/密码/口令使用 Windows DPAPI 加密落盘（用户+机器绑定，拷走配置文件也解不开）；旧版明文配置启动时自动迁移。macOS/Linux 暂为明文存储（0600 权限），系统密钥环支持计划中
+- **全平台密码加密** — 连接密码、SSH 私钥/密码/口令加密落盘（用户+机器绑定，拷走配置文件也解不开）：Windows DPAPI / macOS 钥匙串 / Linux Secret Service（AES-256-GCM 自包含密文，主密钥存系统密钥环）；旧版明文配置启动时自动迁移
 - **SSH 隧道** — 连接支持 SSH 跳板（密码/私钥/口令三种认证）
 - **工作区会话恢复** — 重启后自动恢复：打开的连接标签、激活标签、每连接的视图（数据/监控/CLI…）、选中的键、匹配模式、树/列表视图、键分隔符、上次使用的 DB
 - **窗口状态记忆** — 尺寸、位置、最大化状态、侧栏宽度（可拖拽 160–480px）、深浅主题全部持久化
@@ -156,7 +162,7 @@ push 一个 `v*` tag 即触发 GitHub Actions：全量测试 → 三平台并行
 ## 数据与安全
 
 - 配置目录：Windows `%AppData%/zp-rdm/`，macOS/Linux `~/.config/zp-rdm/`（`connections.json` + `settings.json`）
-- 连接密码、SSH 私钥/密码/口令：Windows 使用 **DPAPI** 加密落盘，内存中保持明文；macOS/Linux 暂为明文（0600 权限）
-- 旧版明文配置启动时自动迁移为密文（Windows）
+- 连接密码、SSH 私钥/密码/口令：全平台加密落盘（Windows **DPAPI** / macOS 钥匙串 / Linux Secret Service，主密钥不可用时回退 0600 密钥文件），内存中保持明文
+- 旧版明文配置启动时自动迁移为密文
 - ⚠️ 连接**导出文件为明文**（可移植性设计），请妥善保管导出文件
 - ⚠️ CLI 命令历史以明文保存在 `settings.json`，包含执行过的完整命令

@@ -129,12 +129,12 @@ function startResize(e: MouseEvent) {
 // ---------- 关于 / 检查更新 ----------
 const aboutVisible = ref(false)
 const checking = ref(false)
-// 平台感知的密码存储说明（secrets 包目前仅 Windows DPAPI 加密）
+// 平台感知的密码存储说明
 const platform = ref('')
 const securityText = computed(() => {
   if (platform.value === 'windows') return '连接密码已通过 Windows DPAPI 加密存储'
-  if (platform.value === 'darwin') return '连接密码当前为明文存储（macOS 钥匙串支持计划中）'
-  return '连接密码当前为明文存储，请注意配置文件权限'
+  if (platform.value === 'darwin') return '连接密码已通过 macOS 钥匙串加密存储'
+  return '连接密码已通过系统密钥环（Secret Service）加密存储'
 })
 onMounted(async () => {
   try { platform.value = (await Environment()).platform } catch { /* 忽略 */ }

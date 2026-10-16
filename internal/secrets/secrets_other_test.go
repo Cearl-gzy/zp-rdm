@@ -1,10 +1,10 @@
-//go:build !windows
+//go:build !windows && !darwin && !linux
 
 package secrets
 
 import "testing"
 
-// 非 Windows 平台为透传桩（DPAPI 不可用），验证透传语义
+// 非主流桌面平台为透传桩，验证透传语义
 func TestPassthroughStub(t *testing.T) {
 	enc, err := Protect("plain-secret")
 	if err != nil {

@@ -10,8 +10,16 @@ import (
 	"zp-rdm/internal/model"
 )
 
-// 加密断言仅在 Windows（DPAPI 可用）生效；其他平台 secrets 为透传桩
-var encryptionActive = runtime.GOOS == "windows"
+// 加密断言在三大桌面平台生效（windows DPAPI / darwin·linux AES-GCM）；其余平台为透传桩
+var encryptionActive = runtime.GOOS == "windows" || runtime.GOOS == "darwin" || runtime.GOOS == "linux"
+
+// cipherPrefix 各平台密文前缀
+func cipherPrefix() string {
+	if runtime.GOOS == "windows" {
+		return "dpapi:"
+	}
+	return "gcm:"
+}
 
 func newTemp(t *testing.T) (*Store, string) {
 	t.Helper()
@@ -45,9 +53,9 @@ func TestDiskEncryption(t *testing.T) {
 	}
 	content := string(b)
 	if encryptionActive {
-		// 磁盘上必须是 dpapi: 密文，且四个敏感字段的明文都不可见
-		if !strings.Contains(content, "dpapi:") {
-			t.Fatal("no dpapi: ciphertext found on disk")
+		// 磁盘上必须是平台前缀密文，且四个敏感字段的明文都不可见
+		if !strings.Contains(content, cipherPrefix()) {
+			t.Fatalf("no %s ciphertext found on disk", cipherPrefix())
 		}
 		for _, plain := range []string{"top-secret-c1", "ssh-pass-c1", "ssh-key-c1", "ssh-phrase-c1"} {
 			if strings.Contains(content, plain) {
@@ -104,14 +112,14 @@ func TestLegacyPlaintextMigration(t *testing.T) {
 	if got, _ := s.Get("old"); got.Password != "legacy-plain" {
 		t.Fatalf("legacy password not loaded: %q", got.Password)
 	}
-	// 文件应被自动重写为密文（仅 Windows；其他平台透传不迁移）
+	// 文件应被自动重写为密文（加密平台；透传平台不迁移）
 	if encryptionActive {
 		b, _ := os.ReadFile(path)
 		if strings.Contains(string(b), "legacy-plain") {
 			t.Fatal("legacy plaintext file not migrated to ciphertext")
 		}
-		if !strings.Contains(string(b), "dpapi:") {
-			t.Fatal("migrated file missing dpapi: prefix")
+		if !strings.Contains(string(b), cipherPrefix()) {
+			t.Fatalf("migrated file missing %s prefix", cipherPrefix())
 		}
 	}
 }

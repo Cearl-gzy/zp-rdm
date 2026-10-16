@@ -155,6 +155,50 @@ func (s *ValueService) GetFullJSON(connID string, db int, key string) (string, e
 	return c.Do(s.ctx, "JSON.GET", key).Text()
 }
 
+// GetJSONPath 读取 JSON 键指定路径的值（path 为 JSONPath 如 $.a.b[0]；空为根 $）。
+// RedisJSON 对 $ 开头的 JSONPath 恒返回"结果集数组"（单结果也包一层），
+// 此处归一化：单结果解包为值本身，多结果保持数组，空结果报错。
+func (s *ValueService) GetJSONPath(connID string, db int, key, path string) (string, error) {
+	if path == "" {
+		path = "$"
+	}
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return "", err
+	}
+	raw, err := c.Do(s.ctx, "JSON.GET", key, path).Text()
+	if err != nil {
+		return "", err
+	}
+	var arr []json.RawMessage
+	if json.Unmarshal([]byte(raw), &arr) == nil {
+		switch len(arr) {
+		case 0:
+			return "", fmt.Errorf("路径无匹配: %s", path)
+		case 1:
+			return string(arr[0]), nil
+		}
+	}
+	// legacy path（. 开头）返回裸值，或多结果数组：原样返回
+	return raw, nil
+}
+
+// SetJSONPath 路径级写入（JSON.SET key path value），value 必须是合法 JSON 文本。
+// JSON.SET 原地修改，键 TTL 不受影响。
+func (s *ValueService) SetJSONPath(connID string, db int, key, path, value string) error {
+	if path == "" {
+		path = "$"
+	}
+	if !json.Valid([]byte(value)) {
+		return fmt.Errorf("JSON 格式不合法")
+	}
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return err
+	}
+	return c.Do(s.ctx, "JSON.SET", key, path, value).Err()
+}
+
 // GetFullString 获取完整字符串值（"加载完整值"，突破预览 1MB 截断）
 func (s *ValueService) GetFullString(connID string, db int, key string) (string, error) {
 	c, err := s.cli(connID, db)

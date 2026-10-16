@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useConnectionStore } from '../stores/connection'
 import { useAppStore } from '../stores/app'
+import { onAppEvent, AppEvents } from '../utils/events'
 import type { ConnState } from '../types'
 import KeyBrowser from './KeyBrowser.vue'
 import KeyAnalysis from './KeyAnalysis.vue'
@@ -9,9 +10,10 @@ import ServerInfo from './ServerInfo.vue'
 import CliTerminal from './CliTerminal.vue'
 import SlowLog from './SlowLog.vue'
 import PubSub from './PubSub.vue'
+import SearchPanel from './SearchPanel.vue'
 import {
   DatabaseOutlined, DashboardOutlined, CodeOutlined,
-  HistoryOutlined, NotificationOutlined, PieChartOutlined,
+  HistoryOutlined, NotificationOutlined, PieChartOutlined, SearchOutlined,
 } from '@ant-design/icons-vue'
 
 const props = defineProps<{ connId: string; state: ConnState }>()
@@ -19,10 +21,23 @@ const props = defineProps<{ connId: string; state: ConnState }>()
 const conn = useConnectionStore()
 const app = useAppStore()
 
-const views = ['data', 'analysis', 'info', 'cli', 'slowlog', 'pubsub']
+// RediSearch 模块加载时才提供搜索视图
+const hasSearch = computed(() => (props.state.modules ?? []).some(m => /search/i.test(m)))
+const views = computed(() => hasSearch.value
+  ? ['data', 'analysis', 'info', 'cli', 'slowlog', 'pubsub', 'search']
+  : ['data', 'analysis', 'info', 'cli', 'slowlog', 'pubsub'])
 const savedView = app.workspace.conns[props.connId]?.view ?? 'data'
-const activeView = ref(views.includes(savedView) ? savedView : 'data')
+const activeView = ref(views.value.includes(savedView) ? savedView : 'data')
 watch(activeView, v => app.patchConnWorkspace(props.connId, { view: v }))
+
+// 搜索面板"打开键"→ 切到数据视图（KeyBrowser 负责选中定位）
+let offOpenKey: (() => void) | null = null
+onMounted(() => {
+  offOpenKey = onAppEvent<{ connId: string; key: string }>(AppEvents.OpenKey, d => {
+    if (d?.connId === props.connId) activeView.value = 'data'
+  })
+})
+onBeforeUnmount(() => offOpenKey?.())
 
 const db = computed({
   get: () => conn.currentDb[props.connId] ?? 0,
@@ -57,6 +72,9 @@ const dbOptions = computed(() =>
           <a-segmented-option value="pubsub">
             <span class="seg-item"><NotificationOutlined /> 发布订阅</span>
           </a-segmented-option>
+          <a-segmented-option v-if="hasSearch" value="search">
+            <span class="seg-item"><SearchOutlined /> 搜索</span>
+          </a-segmented-option>
         </a-segmented>
       </div>
       <div class="vh-right">
@@ -80,6 +98,7 @@ const dbOptions = computed(() =>
       <CliTerminal v-show="activeView === 'cli'" :conn-id="connId" :db="db" />
       <SlowLog v-if="activeView === 'slowlog'" :conn-id="connId" :db="db" />
       <PubSub v-if="activeView === 'pubsub'" :conn-id="connId" :db="db" />
+      <SearchPanel v-if="activeView === 'search'" :conn-id="connId" :db="db" />
     </div>
   </div>
 </template>
