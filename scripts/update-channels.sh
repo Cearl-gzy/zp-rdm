@@ -13,12 +13,16 @@ GH="${GH_PATH:-/c/Program Files/GitHub CLI/gh.exe}"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-echo "== 下载资产并计算 sha256 =="
-dl() { # $1=资产名
-  "$GH" api "repos/${REPO}/releases/assets" --jq ".[] | select(.name==\"$1\") | .id" > "$WORK/id"
-  [ -s "$WORK/id" ] || { echo "资产 $1 不存在，Release 未就绪？"; exit 1; }
-  "$GH" api "repos/${REPO}/releases/assets/$(cat "$WORK/id")" -H "Accept: application/octet-stream" > "$WORK/$1"
-  sha256sum "$WORK/$1" | cut -d' ' -f1
+echo "== 读取资产 sha256（API digest 字段，免下载）=="
+# 资产对象自带 "digest": "sha256:…"（GitHub 按存储对象计算，权威值），
+# 比 octet-stream 下载再本地算快得多（objects.githubusercontent.com 在本网络极慢）。
+"$GH" api "repos/${REPO}/releases/tags/${TAG}" \
+  --jq '.assets[] | .name + " " + ((.digest // "") | sub("^sha256:"; ""))' > "$WORK/assets.txt"
+dl() { # $1=资产名 → stdout sha256
+  local sha
+  sha="$(awk -v n="$1" '$1==n {print $2}' "$WORK/assets.txt")"
+  [ -n "$sha" ] || { echo "资产 $1 不存在或无 sha256 digest，Release 未就绪？"; exit 1; }
+  echo "$sha"
 }
 
 SHA_EXE="$(dl zp-rdm.exe)"
