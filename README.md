@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.11.0-red)
+![version](https://img.shields.io/badge/version-1.12.0-red)
 
 ---
 
@@ -90,6 +90,8 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **TOP Keys 排行** — `MEMORY USAGE` 采样统计前 20 大键，类型、大小、元素数一表看清
 - **TTL 分布** — 永久 / <1h / <24h / <7d / <30d / ≥30d 六档柱状分布，快速发现过期策略问题
 - **前缀聚合** — 按前缀（可自定义分隔符）聚合键数与内存占用，定位"哪个业务吃了内存"
+- **大键扫描报告** — 可配键模式 / 采样上限（1万~20万）/ TOP N（20~200）的深度扫描：逐键 `MEMORY USAGE` + 元素数 + TTL，类型聚合分布，耗时与截断标记一目了然
+- **热点键统计** — 双模式：① MONITOR 命令流采样（任意实例可用，客户端聚合读/写分离计数，独立连接不影响 MONITOR 视图，最长 300 秒自动停止）② `OBJECT FREQ`（LFU 淘汰策略下直读 Redis 访问计数，非 LFU 策略给出明确提示）
 
 ### 📈 监控大盘
 

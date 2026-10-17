@@ -20,8 +20,9 @@ type ServerService struct {
 	manager *redisx.Manager
 
 	mu       sync.Mutex
-	subs     map[string]*redis.PubSub // key: connID|db|channel
-	monitors map[string]net.Conn      // key: connID|db
+	subs     map[string]*redis.PubSub  // key: connID|db|channel
+	monitors map[string]net.Conn       // key: connID|db
+	hotkeys  map[string]*hotKeySampler // key: connID|db
 }
 
 func NewServerService(m *redisx.Manager) *ServerService {
@@ -29,6 +30,7 @@ func NewServerService(m *redisx.Manager) *ServerService {
 		manager:  m,
 		subs:     make(map[string]*redis.PubSub),
 		monitors: make(map[string]net.Conn),
+		hotkeys:  make(map[string]*hotKeySampler),
 	}
 }
 

@@ -164,7 +164,10 @@ func TestSearchAggregate(t *testing.T) {
 		"SCHEMA", "region", "TAG", "amount", "NUMERIC").Err(); err != nil {
 		t.Fatalf("FT.CREATE: %v", err)
 	}
-	rows := []struct{ region string; amount int }{
+	rows := []struct {
+		region string
+		amount int
+	}{
 		{"north", 10}, {"north", 20}, {"south", 5}, {"south", 15}, {"south", 30}, {"east", 7},
 	}
 	for i, r := range rows {

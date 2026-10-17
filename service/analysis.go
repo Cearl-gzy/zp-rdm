@@ -1,8 +1,10 @@
 package service
 
 import (
+	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -130,4 +132,147 @@ func (s *KeyService) AnalyzeKeys(connID string, db int, delimiter string) (*mode
 	}
 	result.TopKeys = topKeys
 	return result, nil
+}
+
+// bigKeyLenCmd 各类型取元素数的命令（string 为字节长度）
+var bigKeyLenCmd = map[string]string{
+	"string": "STRLEN",
+	"list":   "LLEN",
+	"set":    "SCARD",
+	"zset":   "ZCARD",
+	"hash":   "HLEN",
+	"stream": "XLEN",
+}
+
+// insertBigKey 把候选插入按 Size 降序的 top 切片（保持长度 ≤ topN）
+func insertBigKey(top []model.BigKeyEntry, e model.BigKeyEntry, topN int) []model.BigKeyEntry {
+	if len(top) == topN && e.Size <= top[len(top)-1].Size {
+		return top
+	}
+	pos := len(top)
+	for i, cur := range top {
+		if e.Size > cur.Size {
+			pos = i
+			break
+		}
+	}
+	top = append(top, model.BigKeyEntry{})
+	copy(top[pos+1:], top[pos:])
+	top[pos] = e
+	if len(top) > topN {
+		top = top[:topN]
+	}
+	return top
+}
+
+// BigKeyReport 大键扫描报告：按 pattern 采样扫描，逐键统计内存/元素数/TTL，
+// 输出 TOP N 排行 + 类型聚合。集群模式仅覆盖单节点（与键分析相同的已知限制）。
+func (s *KeyService) BigKeyReport(connID string, db int, pattern string, maxScan int64, topN int) (*model.BigKeyReport, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return nil, err
+	}
+	if pattern == "" {
+		pattern = "*"
+	}
+	if maxScan <= 0 {
+		maxScan = 50000
+	}
+	if maxScan > analyzeMaxScan {
+		maxScan = analyzeMaxScan
+	}
+	if topN < 10 {
+		topN = 10
+	}
+	if topN > 200 {
+		topN = 200
+	}
+	ctx := s.ctx
+	start := time.Now()
+
+	report := &model.BigKeyReport{Top: []model.BigKeyEntry{}, Types: []model.BigKeyTypeStat{}}
+	typeStats := map[string]*model.BigKeyTypeStat{}
+
+	var cursor uint64
+	for {
+		var batch []string
+		batch, cursor, err = c.Scan(ctx, cursor, pattern, 1000).Result()
+		if err != nil {
+			return nil, fmt.Errorf("SCAN 失败: %w", err)
+		}
+		if len(batch) > 0 {
+			// 第一批管道：TYPE（元素数命令依赖类型）
+			pipe := c.Pipeline()
+			typeCmds := make([]*redis.StatusCmd, len(batch))
+			for i, k := range batch {
+				typeCmds[i] = pipe.Type(ctx, k)
+			}
+			_, _ = pipe.Exec(ctx)
+
+			// 第二批管道：MEMORY USAGE + TTL + 元素数
+			pipe2 := c.Pipeline()
+			memCmds := make([]*redis.Cmd, len(batch))
+			ttlCmds := make([]*redis.DurationCmd, len(batch))
+			lenCmds := make([]*redis.Cmd, len(batch))
+			types := make([]string, len(batch))
+			for i, k := range batch {
+				t := typeCmds[i].Val()
+				types[i] = t
+				if t == "" || t == "none" {
+					continue
+				}
+				memCmds[i] = pipe2.Do(ctx, "MEMORY", "USAGE", k)
+				ttlCmds[i] = pipe2.TTL(ctx, k)
+				if cmd, ok := bigKeyLenCmd[t]; ok {
+					lenCmds[i] = pipe2.Do(ctx, cmd, k)
+				}
+			}
+			_, _ = pipe2.Exec(ctx)
+
+			for i, k := range batch {
+				t := types[i]
+				if t == "" || t == "none" {
+					continue
+				}
+				var size, length int64
+				if memCmds[i] != nil {
+					size, _ = memCmds[i].Int64()
+				}
+				if lenCmds[i] != nil {
+					length, _ = lenCmds[i].Int64()
+				}
+				var ttl int64
+				if ttlCmds[i] != nil {
+					ttl = ttlSeconds(ttlCmds[i].Val())
+				}
+				report.Scanned++
+
+				ts, ok := typeStats[t]
+				if !ok {
+					ts = &model.BigKeyTypeStat{Type: t}
+					typeStats[t] = ts
+				}
+				ts.Count++
+				ts.Size += size
+
+				report.Top = insertBigKey(report.Top, model.BigKeyEntry{
+					Key: k, Type: t, Size: size, Len: length, TTL: ttl,
+				}, topN)
+			}
+		}
+		if cursor == 0 || report.Scanned >= maxScan {
+			if report.Scanned >= maxScan && cursor != 0 {
+				report.Truncated = true
+			}
+			break
+		}
+	}
+
+	report.TotalKeys, _ = c.DBSize(ctx).Result()
+	report.ElapsedMs = time.Since(start).Milliseconds()
+	for _, ts := range typeStats {
+		report.Types = append(report.Types, *ts)
+	}
+	sort.Slice(report.Types, func(a, b int) bool { return report.Types[a].Size > report.Types[b].Size })
+	return report, nil
 }

@@ -14,19 +14,19 @@ type SSHConfig struct {
 
 // ConnectionProfile 连接配置
 type ConnectionProfile struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Group    string    `json:"group"`
-	Host     string    `json:"host"`
-	Port     int       `json:"port"`
-	Username string    `json:"username"`
-	Password string    `json:"password"`
-	UseTLS   bool      `json:"useTls"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Group    string `json:"group"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	UseTLS   bool   `json:"useTls"`
 	// TLSSkipVerify 跳过服务端证书校验；nil（旧配置）按 true 处理，保持历史行为
-	TLSSkipVerify *bool  `json:"tlsSkipVerify"`
-	TLSCaCert     string `json:"tlsCaCert"`     // 自定义 CA 证书 PEM 内容（可选）
-	TLSClientCert string `json:"tlsClientCert"` // mTLS 客户端证书 PEM（可选）
-	TLSClientKey  string `json:"tlsClientKey"`  // mTLS 客户端私钥 PEM（可选，敏感，加密落盘）
+	TLSSkipVerify *bool     `json:"tlsSkipVerify"`
+	TLSCaCert     string    `json:"tlsCaCert"`     // 自定义 CA 证书 PEM 内容（可选）
+	TLSClientCert string    `json:"tlsClientCert"` // mTLS 客户端证书 PEM（可选）
+	TLSClientKey  string    `json:"tlsClientKey"`  // mTLS 客户端私钥 PEM（可选，敏感，加密落盘）
 	DB            int       `json:"db"`
 	SSH           SSHConfig `json:"ssh"`
 	Color         string    `json:"color"`
@@ -127,6 +127,72 @@ type KeyAnalysis struct {
 	TopKeys     []TopKey     `json:"topKeys"`
 	TTLBuckets  []TTLBucket  `json:"ttlBuckets"`
 	Prefixes    []PrefixStat `json:"prefixes"`
+}
+
+// BigKeyEntry 大键扫描报告条目
+type BigKeyEntry struct {
+	Key  string `json:"key"`
+	Type string `json:"type"`
+	Size int64  `json:"size"` // MEMORY USAGE 字节数（Redis < 4.0 无此命令时为 0）
+	Len  int64  `json:"len"`  // 元素数（string 为字节长度）
+	TTL  int64  `json:"ttl"`  // 秒，-1 永久
+}
+
+// BigKeyTypeStat 大键报告的类型聚合
+type BigKeyTypeStat struct {
+	Type  string `json:"type"`
+	Count int64  `json:"count"`
+	Size  int64  `json:"size"`
+}
+
+// BigKeyReport 大键扫描报告
+type BigKeyReport struct {
+	TotalKeys int64            `json:"totalKeys"`
+	Scanned   int64            `json:"scanned"`
+	ElapsedMs int64            `json:"elapsedMs"`
+	Truncated bool             `json:"truncated"` // 达到采样上限，结果为部分扫描
+	Top       []BigKeyEntry    `json:"top"`
+	Types     []BigKeyTypeStat `json:"types"`
+}
+
+// HotKeyFreqEntry OBJECT FREQ 热点键条目
+type HotKeyFreqEntry struct {
+	Key  string `json:"key"`
+	Type string `json:"type"`
+	Freq int64  `json:"freq"` // LFU 计数（未访问过为 0）
+}
+
+// HotKeyFreqReport OBJECT FREQ 扫描结果
+type HotKeyFreqReport struct {
+	Policy    string            `json:"policy"`    // 当前 maxmemory-policy
+	Available bool              `json:"available"` // 仅 LFU 策略下可用
+	Scanned   int64             `json:"scanned"`
+	Keys      []HotKeyFreqEntry `json:"keys"`
+}
+
+// HotKeyEntry MONITOR 采样热点键条目
+type HotKeyEntry struct {
+	Key    string `json:"key"`
+	Hits   int64  `json:"hits"`
+	Reads  int64  `json:"reads"`
+	Writes int64  `json:"writes"`
+}
+
+// HotKeySampleReport MONITOR 采样报告
+type HotKeySampleReport struct {
+	DurationSec float64       `json:"durationSec"`
+	TotalCmds   int64         `json:"totalCmds"`
+	UniqueKeys  int64         `json:"uniqueKeys"`
+	Truncated   bool          `json:"truncated"` // 达到 300s 采样上限自动停止
+	Keys        []HotKeyEntry `json:"keys"`
+}
+
+// HotKeySampleStats 采样进行中的实时进度（轮询用）
+type HotKeySampleStats struct {
+	Running    bool  `json:"running"`
+	ElapsedSec int64 `json:"elapsedSec"`
+	TotalCmds  int64 `json:"totalCmds"`
+	UniqueKeys int64 `json:"uniqueKeys"`
 }
 
 // ListItem list 元素

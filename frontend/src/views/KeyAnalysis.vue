@@ -6,11 +6,14 @@ import { ReloadOutlined, KeyOutlined, PieChartOutlined, DatabaseOutlined, FieldT
 import { AnalyzeKeys } from '../../wailsjs/go/service/KeyService'
 import type { KeyAnalysis } from '../types'
 import { formatBytes, formatTTL, formatNumber } from '../utils/format'
+import BigKeyReport from './BigKeyReport.vue'
+import HotKeyStats from './HotKeyStats.vue'
 
 const props = defineProps<{ connId: string; db: number }>()
 
 const { t } = useI18n()
 
+const mode = ref<'overview' | 'bigkey' | 'hotkey'>('overview')
 const data = ref<KeyAnalysis | null>(null)
 const loading = ref(false)
 const delimiter = ref(':')
@@ -45,6 +48,25 @@ const avgSize = computed(() => {
 
 <template>
   <div class="analysis">
+    <div class="an-mode-bar">
+      <a-segmented
+        v-model:value="mode"
+        :options="[
+          { value: 'overview', label: t('analysis.modeOverview') },
+          { value: 'bigkey', label: t('analysis.modeBigKey') },
+          { value: 'hotkey', label: t('analysis.modeHotKey') },
+        ]"
+      />
+    </div>
+
+    <div v-if="mode === 'bigkey'" class="an-sub">
+      <BigKeyReport :conn-id="connId" :db="db" />
+    </div>
+    <div v-else-if="mode === 'hotkey'" class="an-sub">
+      <HotKeyStats :conn-id="connId" :db="db" />
+    </div>
+
+    <template v-else>
     <div class="an-toolbar">
       <a-tooltip :title="t('analysis.delimiterTip')">
         <a-select v-model:value="delimiter" size="small" style="width: 72px" @change="analyze">
@@ -140,11 +162,21 @@ const avgSize = computed(() => {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
 <style scoped>
 .analysis { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.an-mode-bar {
+  padding: 10px 16px 0;
+  flex-shrink: 0;
+}
+.an-sub {
+  flex: 1; overflow-y: auto;
+  padding: 0 16px 20px;
+  display: flex; flex-direction: column;
+}
 .an-toolbar {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 16px;

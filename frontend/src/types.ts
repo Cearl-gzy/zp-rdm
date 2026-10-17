@@ -78,6 +78,39 @@ export interface KeyAnalysis {
   prefixes: PrefixStat[]
 }
 
+export interface BigKeyEntry { key: string; type: string; size: number; len: number; ttl: number }
+export interface BigKeyTypeStat { type: string; count: number; size: number }
+export interface BigKeyReport {
+  totalKeys: number
+  scanned: number
+  elapsedMs: number
+  truncated: boolean
+  top: BigKeyEntry[]
+  types: BigKeyTypeStat[]
+}
+
+export interface HotKeyFreqEntry { key: string; type: string; freq: number }
+export interface HotKeyFreqReport {
+  policy: string
+  available: boolean
+  scanned: number
+  keys: HotKeyFreqEntry[]
+}
+export interface HotKeyEntry { key: string; hits: number; reads: number; writes: number }
+export interface HotKeySampleReport {
+  durationSec: number
+  totalCmds: number
+  uniqueKeys: number
+  truncated: boolean
+  keys: HotKeyEntry[]
+}
+export interface HotKeySampleStats {
+  running: boolean
+  elapsedSec: number
+  totalCmds: number
+  uniqueKeys: number
+}
+
 export interface HashItem { field: string; value: string }
 export interface ListItem { index: number; value: string }
 export interface ZSetItem { member: string; score: number }

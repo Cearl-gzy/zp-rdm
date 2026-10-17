@@ -43,22 +43,10 @@ func readRESPLine(r *bufio.Reader) (string, error) {
 	return line[1:], nil
 }
 
-// StartMonitor 启动 MONITOR，命令流经事件 monitor:connID:db 逐行推送
-func (s *ServerService) StartMonitor(connID string, db int) error {
-	c, err := s.cli(connID, db)
-	if err != nil {
-		return err
-	}
-	monKey := fmt.Sprintf("%s|%d", connID, db)
-	s.mu.Lock()
-	if _, ok := s.monitors[monKey]; ok {
-		s.mu.Unlock()
-		return fmt.Errorf("MONITOR 已在运行")
-	}
-	s.mu.Unlock()
-
-	// MONITOR 需要裸连接。单机取 client 配置；集群取种子节点地址
-	// （MONITOR 只能看到单个节点的命令流，集群模式的已知限制）。
+// openMonitorConn 建立一条已认证、已选库、已进入 MONITOR 模式的裸连接。
+// 单机取 client 配置；集群取种子节点地址
+// （MONITOR 只能看到单个节点的命令流，集群模式的已知限制）。
+func openMonitorConn(ctx context.Context, c redis.UniversalClient, db int) (net.Conn, *bufio.Reader, error) {
 	var addr, network, username, password string
 	var dbSel int
 	var dialer func(ctx context.Context, network, addr string) (net.Conn, error)
@@ -75,30 +63,33 @@ func (s *ServerService) StartMonitor(connID string, db int) error {
 		username, password = opt.Username, opt.Password
 		dialer, tlsCfg = opt.Dialer, opt.TLSConfig
 	default:
-		return fmt.Errorf("不支持的客户端类型 %T", c)
+		return nil, nil, fmt.Errorf("不支持的客户端类型 %T", c)
+	}
+	if dbSel == 0 {
+		dbSel = db // 集群模式无 SELECT（仅 db 0）；单机按调用方要求选库
 	}
 	if dialer == nil {
 		d := &net.Dialer{Timeout: 8 * time.Second}
 		dialer = d.DialContext
 	}
-	raw, err := dialer(s.ctx, network, addr)
+	raw, err := dialer(ctx, network, addr)
 	if err != nil {
-		return fmt.Errorf("连接失败: %w", err)
+		return nil, nil, fmt.Errorf("连接失败: %w", err)
 	}
 	if tlsCfg != nil {
 		tc := tls.Client(raw, tlsCfg)
 		if err := tc.Handshake(); err != nil {
 			_ = raw.Close()
-			return fmt.Errorf("TLS 握手失败: %w", err)
+			return nil, nil, fmt.Errorf("TLS 握手失败: %w", err)
 		}
 		raw = tc
 	}
 
 	r := bufio.NewReader(raw)
 	w := bufio.NewWriter(raw)
-	fail := func(err error) error {
+	fail := func(err error) (net.Conn, *bufio.Reader, error) {
 		_ = raw.Close()
-		return err
+		return nil, nil, err
 	}
 	// 认证 + 选库 + MONITOR
 	if password != "" {
@@ -127,6 +118,27 @@ func (s *ServerService) StartMonitor(connID string, db int) error {
 	}
 	if _, err := readRESPLine(r); err != nil { // MONITOR 的 +OK
 		return fail(fmt.Errorf("MONITOR 启动失败: %w", err))
+	}
+	return raw, r, nil
+}
+
+// StartMonitor 启动 MONITOR，命令流经事件 monitor:connID:db 逐行推送
+func (s *ServerService) StartMonitor(connID string, db int) error {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return err
+	}
+	monKey := fmt.Sprintf("%s|%d", connID, db)
+	s.mu.Lock()
+	if _, ok := s.monitors[monKey]; ok {
+		s.mu.Unlock()
+		return fmt.Errorf("MONITOR 已在运行")
+	}
+	s.mu.Unlock()
+
+	raw, r, err := openMonitorConn(s.ctx, c, db)
+	if err != nil {
+		return err
 	}
 
 	s.mu.Lock()

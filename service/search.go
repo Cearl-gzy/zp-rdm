@@ -258,7 +258,7 @@ type SearchAggregateRequest struct {
 
 // SearchAggregateResult FT.AGGREGATE 结果（行为动态列）
 type SearchAggregateResult struct {
-	Total int64             `json:"total"`
+	Total int64               `json:"total"`
 	Rows  []map[string]string `json:"rows"`
 }
 
