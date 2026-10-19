@@ -38,7 +38,7 @@ export default {
     updateVerifying: 'Download finished, verifying installer…',
     updateFailed: 'Auto update failed',
     updateReady: 'Update Ready',
-    updateReadyContent: 'The installer has been downloaded and verified. Restart the app to finish installation? (Install location stays the same.)',
+    updateReadyContent: 'The installer has been downloaded and verified. Restart the app to finish installation? (Install location stays the same. After the app exits, Windows will show a UAC prompt once — please click "Yes".)',
     updateRestart: 'Restart & Install',
     alreadyLatest: 'You are on the latest version',
   },

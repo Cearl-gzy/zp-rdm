@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -32,20 +33,28 @@ func VerifyFileSHA256(path, wantHex string) error {
 	return nil
 }
 
-// BuildUpdateBat 生成 Windows 自动更新辅助批处理：
-// 等主进程退出 → 静默安装到原目录（/D 保留用户自定义安装位置）→ 启动新版 → 自删。
-// installer/targetDir 由调用方保证来自应用内部（非用户输入），bat 中不转义。
-func BuildUpdateBat(installer, targetDir, exeName string) string {
-	// NSIS /D 必须是最后一个参数且不带引号
-	return "@echo off\r\n" +
-		"set PID=%1\r\n" +
-		":wait\r\n" +
-		"tasklist /FI \"PID eq %PID%\" | find \"%PID%\" >nul 2>&1\r\n" +
-		"if not errorlevel 1 (\r\n" +
-		"  timeout /t 1 /nobreak >nul\r\n" +
-		"  goto wait\r\n" +
-		")\r\n" +
-		"start \"\" /wait \"" + installer + "\" /S /D=" + targetDir + "\r\n" +
-		"start \"\" \"" + targetDir + "\\" + exeName + "\"\r\n" +
-		"del /q \"%~f0\"\r\n"
+// psQuote PowerShell 单引号字符串字面量（内嵌单引号双写转义）
+func psQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+}
+
+// BuildUpdateCommand 生成 Windows 自动更新辅助命令（PowerShell，返回程序名 + 参数）：
+// 等主进程退出 → UAC 提权静默安装到原目录（/S /D= 保留自定义安装位置）→
+// 清理安装包 → 启动新版。用户拒绝 UAC 时回退启动旧版，不留死窗口。
+// 不用 bat：tasklist|find 管道可能死锁（写端句柄泄漏导致 find 永远等不到 EOF），
+// 且 start 无法为 requireAdministrator 的安装器提权（ERROR_ELEVATION_REQUIRED）。
+// installer/targetDir 由调用方保证来自应用内部（非用户输入），按 PS 字面量转义。
+func BuildUpdateCommand(pid int, installer, targetDir, exeName string) (string, []string) {
+	exe := targetDir + `\` + exeName
+	script := "$appPid = " + strconv.Itoa(pid) + "; " +
+		"$installer = " + psQuote(installer) + "; " +
+		"$exe = " + psQuote(exe) + "; " +
+		"while (Get-Process -Id $appPid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 500 }; " +
+		"try { " +
+		// NSIS /D 必须是最后一个参数且不带引号；ArgumentList 传单字符串时 PowerShell 原样拼到命令行
+		"Start-Process -FilePath $installer -ArgumentList " + psQuote("/S /D="+targetDir) + " -Verb RunAs -Wait; " +
+		"Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue " +
+		"} catch {}; " +
+		"Start-Process -FilePath $exe -ErrorAction SilentlyContinue"
+	return "powershell.exe", []string{"-NoProfile", "-WindowStyle", "Hidden", "-Command", script}
 }

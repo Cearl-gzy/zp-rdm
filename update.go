@@ -15,7 +15,7 @@ import (
 )
 
 // 应用内自动更新：DownloadUpdate 下载安装包（进度事件 update:download）→
-// sha256 校验 → ApplyUpdate 退出并由辅助脚本静默安装到原目录、重启新版。
+// sha256 校验 → ApplyUpdate 退出并由辅助进程提权静默安装到原目录、重启新版。
 // 仅 Windows 自动安装；其他平台仍走浏览器下载（macOS 建议 brew / Linux 包管理器）。
 
 // updateProgress 下载进度事件负载
@@ -156,7 +156,8 @@ func (a *App) DownloadUpdate() (string, error) {
 }
 
 // ApplyUpdate 退出应用并静默安装已下载的更新包（Windows）。
-// 辅助 bat 等主进程退出后执行 installer /S /D=<当前安装目录>，保留原安装位置，随后启动新版。
+// 辅助进程等主进程退出后弹一次 UAC，提权执行 installer /S /D=<当前安装目录>，
+// 保留原安装位置，随后启动新版（拒绝 UAC 则回退启动旧版）。
 func (a *App) ApplyUpdate() error {
 	if a.updateFile == "" {
 		return fmt.Errorf("尚未下载更新包")
@@ -172,15 +173,10 @@ func (a *App) ApplyUpdate() error {
 	targetDir := filepath.Dir(exe)
 	exeName := filepath.Base(exe) // 通常为 zp-rdm.exe
 
-	bat := updatecheck.BuildUpdateBat(a.updateFile, targetDir, exeName)
-	batPath := filepath.Join(os.TempDir(), "zp-rdm-update.bat")
-	if err := os.WriteFile(batPath, []byte(bat), 0o600); err != nil {
+	if err := startUpdateHelper(a.updateFile, targetDir, exeName); err != nil {
 		return err
 	}
-	if err := startUpdateBat(batPath); err != nil {
-		return err
-	}
-	// 辅助脚本已接管，退出主程序（触发 onShutdown 保存状态）
+	// 辅助进程已接管，退出主程序（触发 onShutdown 保存状态）
 	wailsRuntime.Quit(a.ctx)
 	return nil
 }

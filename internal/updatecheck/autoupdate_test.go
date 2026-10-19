@@ -62,20 +62,42 @@ func TestVerifyFileSHA256(t *testing.T) {
 	}
 }
 
-func TestBuildUpdateBat(t *testing.T) {
-	bat := BuildUpdateBat(`C:\Users\x\AppData\Local\Temp\zp-rdm-update-1.13.0.exe`, `C:\Users\x\AppData\Local\zp-rdm`, "zp-rdm.exe")
+func TestBuildUpdateCommand(t *testing.T) {
+	name, args := BuildUpdateCommand(20948,
+		`C:\Users\x\AppData\Local\Temp\zp-rdm-update-1.14.1.exe`,
+		`D:\Program Files\ZP\ZP Redis Manager`, "zp-rdm.exe")
+	if name != "powershell.exe" {
+		t.Fatalf("unexpected program: %s", name)
+	}
+	if len(args) < 2 || args[len(args)-2] != "-Command" {
+		t.Fatalf("missing -Command flag: %v", args)
+	}
+	script := args[len(args)-1]
 	for _, want := range []string{
-		"tasklist /FI \"PID eq %PID%\"",
-		"/S /D=C:\\Users\\x\\AppData\\Local\\zp-rdm\r\n", // /D 必须是最后参数且无引号
-		"\\zp-rdm.exe\"\r\n",
-		"del /q \"%~f0\"",
+		"$appPid = 20948",                              // 等待主进程退出
+		"Get-Process -Id $appPid",                      // 轮询进程存在性（替代易死锁的 tasklist|find 管道）
+		"-Verb RunAs -Wait",                            // UAC 提权（安装器 requireAdministrator）并等待完成
+		`'/S /D=D:\Program Files\ZP\ZP Redis Manager'`, // /D 最后参数且无引号（NSIS 硬性要求）
+		`'C:\Users\x\AppData\Local\Temp\zp-rdm-update-1.14.1.exe'`,
+		`'D:\Program Files\ZP\ZP Redis Manager\zp-rdm.exe'`, // 装完启动新版
+		"Remove-Item",                                       // 清理安装包
+		"catch {}",                                          // 拒绝 UAC 时不中断，回退启动旧版
 	} {
-		if !strings.Contains(bat, want) {
-			t.Fatalf("bat missing %q:\n%s", want, bat)
+		if !strings.Contains(script, want) {
+			t.Fatalf("script missing %q:\n%s", want, script)
 		}
 	}
-	// 静默参数存在
-	if !strings.Contains(bat, " /S ") {
-		t.Fatal("missing NSIS silent switch")
+	// 安装在前、重启在后
+	if strings.Index(script, "/S /D=") > strings.Index(script, "Start-Process -FilePath $exe") {
+		t.Fatalf("relaunch must come after install:\n%s", script)
+	}
+}
+
+func TestBuildUpdateCommandQuoting(t *testing.T) {
+	// 路径含单引号时按 PowerShell 规则双写转义
+	_, args := BuildUpdateCommand(1, `C:\it's here\setup.exe`, `C:\dir`, "a.exe")
+	script := args[len(args)-1]
+	if !strings.Contains(script, `'C:\it''s here\setup.exe'`) {
+		t.Fatalf("single quote not escaped:\n%s", script)
 	}
 }

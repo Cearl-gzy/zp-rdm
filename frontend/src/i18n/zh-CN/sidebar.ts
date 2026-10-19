@@ -38,7 +38,7 @@ export default {
     updateVerifying: '下载完成，正在校验安装包…',
     updateFailed: '自动更新失败',
     updateReady: '更新已就绪',
-    updateReadyContent: '安装包已下载并通过完整性校验。重启应用以完成安装？（安装位置保持不变）',
+    updateReadyContent: '安装包已下载并通过完整性校验。重启应用以完成安装？（安装位置保持不变；应用退出后系统会弹出一次 UAC 授权提示，请点击"是"）',
     updateRestart: '重启并安装',
     alreadyLatest: '当前已是最新版本',
   },

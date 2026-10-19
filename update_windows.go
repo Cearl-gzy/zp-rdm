@@ -7,11 +7,15 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+
+	"zp-rdm/internal/updatecheck"
 )
 
-// startUpdateBat 以脱离进程组的方式启动更新辅助批处理（父进程退出后仍存活）
-func startUpdateBat(batPath string) error {
-	cmd := exec.Command("cmd", "/C", batPath, fmt.Sprintf("%d", os.Getpid()))
+// startUpdateHelper 以脱离进程组的方式启动更新辅助进程（PowerShell 隐藏窗口，
+// 父进程退出后仍存活）。辅助进程等主进程退出后弹 UAC 提权静默安装，随后启动新版。
+func startUpdateHelper(installer, targetDir, exeName string) error {
+	name, args := updatecheck.BuildUpdateCommand(os.Getpid(), installer, targetDir, exeName)
+	cmd := exec.Command(name, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: 0x00000008 | 0x00000200, // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
 	}
