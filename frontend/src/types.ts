@@ -27,6 +27,9 @@ export interface ConnectionProfile {
   ssh: SSHConfig
   color: string
   cluster?: boolean // Redis Cluster 模式
+  sentinel?: boolean // Redis Sentinel 模式（host:port 为首个哨兵地址）
+  masterName?: string // 哨兵监控的 master 名称
+  sentinelAddrs?: string // 额外哨兵地址（每行或逗号分隔 host:port）
 }
 
 export interface ConnState {

@@ -42,6 +42,31 @@ func NewManager() *Manager {
 
 func clientKey(connID string, db int) string { return fmt.Sprintf("%s|%d", connID, db) }
 
+// sentinelAddrList 汇总哨兵地址：Host:Port 为首，外加 SentinelAddrs 里
+// 每行/逗号分隔的地址；去空白、去重、保持顺序。
+func sentinelAddrList(p model.ConnectionProfile) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(a string) {
+		a = strings.TrimSpace(a)
+		if a == "" || seen[a] {
+			return
+		}
+		seen[a] = true
+		out = append(out, a)
+	}
+	if p.Host != "" {
+		add(fmt.Sprintf("%s:%d", p.Host, p.Port))
+	}
+	// SentinelAddrs 允许换行与逗号混合分隔
+	for _, line := range strings.Split(p.SentinelAddrs, "\n") {
+		for _, part := range strings.Split(line, ",") {
+			add(part)
+		}
+	}
+	return out
+}
+
 // Open 打开连接（测试连通性并缓存）
 func (m *Manager) Open(ctx context.Context, p model.ConnectionProfile) (*model.ConnState, error) {
 	m.Close(p.ID)
@@ -90,6 +115,9 @@ func (m *Manager) Open(ctx context.Context, p model.ConnectionProfile) (*model.C
 		if mode == "" {
 			mode = "standalone"
 		}
+	}
+	if p.Sentinel {
+		mode = "sentinel" // master 自报 standalone/replica，UI 展示以连接模式为准
 	}
 
 	st := &model.ConnState{
@@ -151,6 +179,33 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 			}
 		}
 		return redis.NewClusterClient(opts), nil
+	}
+	if p.Sentinel {
+		addrs := sentinelAddrList(p)
+		if p.MasterName == "" {
+			return nil, errors.New("Sentinel 模式需要填写 master 名称")
+		}
+		if len(addrs) == 0 {
+			return nil, errors.New("Sentinel 模式需要至少一个哨兵地址")
+		}
+		opts := &redis.FailoverOptions{
+			MasterName:    p.MasterName,
+			SentinelAddrs: addrs,
+			Username:      p.Username,
+			Password:      p.Password,
+			DB:            db,
+			DialTimeout:   8 * time.Second,
+			ReadTimeout:   30 * time.Second,
+			WriteTimeout:  30 * time.Second,
+			TLSConfig:     tlsCfg, // 同时用于哨兵与数据节点连接
+		}
+		if sshCli != nil {
+			// 所有拨号（哨兵发现 + master/replica 数据连接）都走 SSH 通道
+			opts.Dialer = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				return dialThroughSSH(sshCli, network, addr)
+			}
+		}
+		return redis.NewFailoverClient(opts), nil
 	}
 	opts := &redis.Options{
 		Addr:         fmt.Sprintf("%s:%d", p.Host, p.Port),

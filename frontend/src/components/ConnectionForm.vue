@@ -21,6 +21,7 @@ function emptyProfile(): ConnectionProfile {
     username: '', password: '', useTls: false,
     tlsSkipVerify: true, tlsCaCert: '', tlsClientCert: '', tlsClientKey: '',
     db: 0, color: COLORS[0], cluster: false,
+    sentinel: false, masterName: '', sentinelAddrs: '',
     ssh: { enabled: false, host: '', port: 22, username: '', authType: 'password', password: '', privateKey: '', passphrase: '' },
   }
 }
@@ -61,6 +62,10 @@ async function onTest() {
 
 async function onSave() {
   if (!form.host) { message.warning(t('connection.hostRequired')); return }
+  if (form.sentinel && !form.masterName?.trim()) {
+    message.warning(t('connection.masterNameRequired'))
+    return
+  }
   saving.value = true
   try {
     await conn.save(JSON.parse(JSON.stringify(form)))
@@ -129,10 +134,34 @@ async function onSave() {
           </div>
           <a-form-item>
             <a-checkbox v-model:checked="form.useTls">{{ t('connection.useTls') }}</a-checkbox>
-            <a-checkbox v-model:checked="form.cluster" style="margin-left: 16px">
+            <a-checkbox
+              v-model:checked="form.cluster"
+              style="margin-left: 16px"
+              :disabled="form.sentinel"
+            >
               {{ t('connection.clusterMode') }}
             </a-checkbox>
+            <a-checkbox
+              v-model:checked="form.sentinel"
+              style="margin-left: 16px"
+              :disabled="form.cluster"
+            >
+              {{ t('connection.sentinelMode') }}
+            </a-checkbox>
           </a-form-item>
+          <template v-if="form.sentinel">
+            <a-form-item :label="t('connection.masterNameLabel')" required>
+              <a-input v-model:value="form.masterName" placeholder="mymaster" />
+            </a-form-item>
+            <a-form-item :label="t('connection.sentinelAddrsLabel')">
+              <a-textarea
+                v-model:value="form.sentinelAddrs"
+                :rows="2"
+                :placeholder="t('connection.sentinelAddrsPlaceholder')"
+                class="mono-input"
+              />
+            </a-form-item>
+          </template>
         </a-form>
       </a-tab-pane>
 

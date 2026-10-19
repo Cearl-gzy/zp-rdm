@@ -69,6 +69,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
+| 哨兵 | Redis Sentinel 连接、故障转移自动跟随、多哨兵地址 |
 | 工程化 | 全平台密码加密、TLS/mTLS 连接、工作区会话恢复、SSH 隧道、命令面板、自动更新 |
 
 ---
@@ -125,6 +126,13 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **hash slot 查询** — 面板内输入任意键即算 `CLUSTER KEYSLOT`，写脚本/排查热点槽必备
 - **跨槽兼容** — 批量删除自动拆分为逐键路由，绕开集群 CROSSSLOT 限制
 - **已知限制**：键分析、MONITOR、CLI 自动补全仅覆盖单节点；RENAME 跨槽会报错（Redis 集群语义）
+
+### 🛰️ Redis Sentinel
+
+- **哨兵连接** — 连接配置勾选「哨兵模式」，填 Master 名称 + 哨兵地址（主机:端口为首个，可追加多个），go-redis FailoverClient 自动发现 master
+- **故障转移自动跟随** — master 切换后客户端自动重连新 master，无需改配置；多 db 支持与单机一致
+- **配置复用** — TLS/mTLS、SSH 隧道与单机配置完全复用（哨兵发现与数据连接均走同一 TLS/隧道）
+- **已知限制**：哨兵自身认证（SentinelUsername/Password）暂不支持；连接的是 master，哨兵节点自身状态不在监控大盘展示
 
 ### 🐌 慢日志 & 发布订阅
 

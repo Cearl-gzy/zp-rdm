@@ -31,6 +31,11 @@ type ConnectionProfile struct {
 	SSH           SSHConfig `json:"ssh"`
 	Color         string    `json:"color"`
 	Cluster       bool      `json:"cluster"` // Redis Cluster 模式（仅 db 0，多节点）
+	// Sentinel 模式：Host:Port 作为首个哨兵地址，MasterName 必填；
+	// 故障转移后客户端自动跟随新 master（go-redis FailoverClient）
+	Sentinel      bool   `json:"sentinel"`
+	MasterName    string `json:"masterName"`
+	SentinelAddrs string `json:"sentinelAddrs"` // 额外哨兵地址（每行或逗号分隔 host:port）
 }
 
 // ConnState 连接打开后的状态
