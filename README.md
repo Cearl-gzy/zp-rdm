@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.14.1-red)
+![version](https://img.shields.io/badge/version-1.15.0-red)
 
 ---
 
@@ -63,10 +63,10 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 模块 | 能力 |
 |---|---|
 | 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载、批量 TTL/移动 DB |
-| 键分析 | TOP Keys、TTL 分布、前缀内存聚合 |
+| 键分析 | TOP Keys、TTL 分布、前缀内存聚合、报告导出（JSON/CSV） |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
 | 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
-| 服务器管理 | CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
+| 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
@@ -94,6 +94,8 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **前缀聚合** — 按前缀（可自定义分隔符）聚合键数与内存占用，定位"哪个业务吃了内存"
 - **大键扫描报告** — 可配键模式 / 采样上限（1万~20万）/ TOP N（20~200）的深度扫描：逐键 `MEMORY USAGE` + 元素数 + TTL，类型聚合分布，耗时与截断标记一目了然
 - **热点键统计** — 双模式：① MONITOR 命令流采样（任意实例可用，客户端聚合读/写分离计数，独立连接不影响 MONITOR 视图，最长 300 秒自动停止）② `OBJECT FREQ`（LFU 淘汰策略下直读 Redis 访问计数，非 LFU 策略给出明确提示）
+- **集群全量分析** — 集群模式下键分析/大键报告自动聚合全部 master 节点（逐节点直连 SCAN，键数为全集群 DBSIZE 汇总）
+- **报告导出** — 概览分析 / 大键报告 / 热点键统计一键导出 JSON（完整结构）或 CSV（分区表格），留存归档或贴进工单
 
 ### 📈 监控大盘
 
@@ -126,7 +128,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **集群视图** — 独立「集群」面板：cluster_state / slots_assigned / 节点数 / 键数概览，节点表展示角色（主/从）、slot 区间与数量、链路状态、当前节点标记
 - **hash slot 查询** — 面板内输入任意键即算 `CLUSTER KEYSLOT`，写脚本/排查热点槽必备
 - **跨槽兼容** — 批量删除自动拆分为逐键路由，绕开集群 CROSSSLOT 限制
-- **已知限制**：键分析、MONITOR、CLI 自动补全仅覆盖单节点；RENAME 跨槽会报错（Redis 集群语义）
+- **已知限制**：MONITOR、CLI 自动补全仅覆盖单节点；RENAME 跨槽会报错（Redis 集群语义）
 
 ### 🛰️ Redis Sentinel
 
@@ -142,9 +144,10 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ### 🛠️ 服务器管理
 
+- **复制拓扑** — `INFO replication` 可视化：master 视角看下游副本列表（地址/状态/延迟秒数/落后字节数/偏移），副本视角看上游链路（状态/上次通信时间/是否同步中），复制积压缓冲用量一目了然；延迟分级着色预警
 - **运行配置** — `CONFIG GET` 全参数搜索表（20+ 常用参数中文说明），`CONFIG SET` 图形化修改（高风险参数二次确认），一键 `CONFIG REWRITE` 持久化
 - **ACL 用户管理** — 用户列表（状态/键/命令/频道/密码数），抽屉式规则编辑：on/off、nopass、密码设置/清除、键模式、命令类别、频道模式 + 附加原始规则，最终规则实时预览；default 用户修改强确认、防误删
-- **已知限制**：集群模式不支持（配置/ACL 不跨节点同步，请用 CLI 逐节点操作）；哨兵模式作用在 master 上可用
+- **已知限制**：集群模式不支持（配置/ACL 不跨节点同步，复制拓扑请用集群视图，均可 CLI 逐节点操作）；哨兵模式作用在 master 上可用
 
 ### 📦 数据迁移
 

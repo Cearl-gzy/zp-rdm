@@ -1,7 +1,22 @@
 export default {
   serverPanel: {
+    tabReplication: 'Replication',
     tabConfig: 'Config',
     tabAcl: 'ACL Users',
+    // ---- Replication topology ----
+    repRefresh: 'Refresh',
+    repSelf: 'This Node',
+    repOffset: 'Replication Offset',
+    repReplicaCount: 'Replicas',
+    repBacklog: 'Backlog',
+    repNoReplicas: 'No replicas (running standalone)',
+    repLag: 'lag {s}s',
+    repBehind: 'behind {n}',
+    repUpstream: 'Upstream Master',
+    repLinkUp: 'Link Up',
+    repLinkDown: 'Link Down',
+    repSyncing: 'Syncing',
+    repLastIO: 'last I/O {s}s ago',
     // ---- Config ----
     cfgSearch: 'Search name / value',
     cfgColParam: 'Parameter',

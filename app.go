@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -20,7 +21,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.14.1"
+const AppVersion = "1.15.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -273,4 +274,12 @@ func (a *App) PickSaveFile(title, defaultFilename string) (string, error) {
 			{DisplayName: "所有文件", Pattern: "*.*"},
 		},
 	})
+}
+
+// SaveTextFile 把文本内容写入指定文件（分析报告导出等；UTF-8，覆盖写）
+func (a *App) SaveTextFile(path, content string) error {
+	if path == "" {
+		return fmt.Errorf("未选择保存路径")
+	}
+	return os.WriteFile(path, []byte(content), 0o644)
 }

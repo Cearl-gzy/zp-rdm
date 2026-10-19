@@ -2,12 +2,13 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { SearchOutlined, PlayCircleOutlined, StopOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, PlayCircleOutlined, StopOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import {
   HotKeyFreq, HotKeySampleStart, HotKeySampleStop, HotKeySampleStats,
 } from '../../wailsjs/go/service/ServerService'
 import type { HotKeyFreqReport, HotKeySampleReport, HotKeySampleStats as SampleStats } from '../types'
 import { formatNumber } from '../utils/format'
+import { exportReport, csvSection } from '../utils/export'
 
 const props = defineProps<{ connId: string; db: number }>()
 
@@ -87,6 +88,37 @@ watch(() => [props.connId, props.db], () => {
 })
 
 const maxHits = computed(() => Math.max(1, ...(report.value?.keys.map(k => k.hits) ?? [1])))
+
+// 导出当前结果（JSON 原始结构 / CSV 分区表）；MONITOR 与 FREQ 模式各自导出当前视图数据
+function onExport({ key }: { key: string }) {
+  if (mode.value === 'monitor') {
+    const d = report.value
+    if (!d) return
+    if (key === 'json') {
+      exportReport('zp-rdm-hotkey-report.json', JSON.stringify(d, null, 2) + '\n', t('analysis.exportDone'))
+      return
+    }
+    const csv = [
+      csvSection('Sample Summary', ['duration_sec', 'total_cmds', 'unique_keys', 'truncated'],
+        [[d.durationSec, d.totalCmds, d.uniqueKeys, d.truncated ? 1 : 0]]),
+      csvSection('Hot Keys', ['key', 'hits', 'reads', 'writes'],
+        d.keys.map(k => [k.key, k.hits, k.reads, k.writes])),
+    ].join('\n\n') + '\n'
+    exportReport('zp-rdm-hotkey-report.csv', csv, t('analysis.exportDone'))
+    return
+  }
+  const d = freqData.value
+  if (!d?.available) return
+  if (key === 'json') {
+    exportReport('zp-rdm-hotkey-freq.json', JSON.stringify(d, null, 2) + '\n', t('analysis.exportDone'))
+    return
+  }
+  const csv = [
+    csvSection('Freq Summary', ['policy', 'scanned'], [[d.policy, d.scanned]]),
+    csvSection('LFU Hot Keys', ['key', 'type', 'freq'], d.keys.map(k => [k.key, k.type, k.freq])),
+  ].join('\n\n') + '\n'
+  exportReport('zp-rdm-hotkey-freq.csv', csv, t('analysis.exportDone'))
+}
 </script>
 
 <template>
@@ -113,6 +145,18 @@ const maxHits = computed(() => Math.max(1, ...(report.value?.keys.map(k => k.hit
           <span class="hk-dot" />
           {{ t('analysis.hotkey.live', { s: stats.elapsedSec, cmds: formatNumber(stats.totalCmds), keys: formatNumber(stats.uniqueKeys) }) }}
         </span>
+        <a-dropdown v-if="report && !sampling">
+          <a-button size="small">
+            <template #icon><DownloadOutlined /></template>
+            {{ t('analysis.export') }}
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onExport">
+              <a-menu-item key="json">{{ t('analysis.exportJson') }}</a-menu-item>
+              <a-menu-item key="csv">{{ t('analysis.exportCsv') }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
         <span class="text-3 hk-tip">{{ t('analysis.hotkey.monitorTip') }}</span>
       </template>
 
@@ -124,6 +168,18 @@ const maxHits = computed(() => Math.max(1, ...(report.value?.keys.map(k => k.hit
         <span v-if="freqData?.available" class="text-3 hk-meta num">
           {{ t('analysis.hotkey.freqScanned', { n: formatNumber(freqData.scanned) }) }}
         </span>
+        <a-dropdown v-if="freqData?.available">
+          <a-button size="small">
+            <template #icon><DownloadOutlined /></template>
+            {{ t('analysis.export') }}
+          </a-button>
+          <template #overlay>
+            <a-menu @click="onExport">
+              <a-menu-item key="json">{{ t('analysis.exportJson') }}</a-menu-item>
+              <a-menu-item key="csv">{{ t('analysis.exportCsv') }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
         <span class="text-3 hk-tip">{{ t('analysis.hotkey.freqTip') }}</span>
       </template>
     </div>

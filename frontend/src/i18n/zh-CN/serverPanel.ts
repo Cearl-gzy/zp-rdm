@@ -1,7 +1,22 @@
 export default {
   serverPanel: {
+    tabReplication: '复制',
     tabConfig: '配置',
     tabAcl: 'ACL 用户',
+    // ---- 复制拓扑 ----
+    repRefresh: '刷新',
+    repSelf: '本节点',
+    repOffset: '复制偏移',
+    repReplicaCount: '下游副本',
+    repBacklog: '积压缓冲',
+    repNoReplicas: '无下游副本（单节点运行）',
+    repLag: '延迟 {s}s',
+    repBehind: '落后 {n}',
+    repUpstream: '上游 Master',
+    repLinkUp: '链路正常',
+    repLinkDown: '链路断开',
+    repSyncing: '同步中',
+    repLastIO: '上次通信 {s}s 前',
     // ---- 配置 ----
     cfgSearch: '搜索参数名 / 值',
     cfgColParam: '参数',

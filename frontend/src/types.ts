@@ -114,6 +114,20 @@ export interface HotKeySampleStats {
   uniqueKeys: number
 }
 
+export interface ReplicaInfo { addr: string; state: string; offset: number; lag: number }
+export interface ReplicationInfo {
+  role: string
+  replicas: ReplicaInfo[]
+  offset: number
+  backlogActive: boolean
+  backlogSize: number
+  backlogHistlen: number
+  masterAddr: string
+  linkStatus: string
+  lastIOSeconds: number
+  syncInProgress: boolean
+}
+
 export interface HashItem { field: string; value: string }
 export interface ListItem { index: number; value: string }
 export interface ZSetItem { member: string; score: number }

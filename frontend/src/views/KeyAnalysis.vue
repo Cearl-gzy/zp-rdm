@@ -2,16 +2,21 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { ReloadOutlined, KeyOutlined, PieChartOutlined, DatabaseOutlined, FieldTimeOutlined } from '@ant-design/icons-vue'
+import { ReloadOutlined, KeyOutlined, PieChartOutlined, DatabaseOutlined, FieldTimeOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { AnalyzeKeys } from '../../wailsjs/go/service/KeyService'
+import { useConnectionStore } from '../stores/connection'
 import type { KeyAnalysis } from '../types'
 import { formatBytes, formatTTL, formatNumber } from '../utils/format'
+import { exportReport, csvSection } from '../utils/export'
 import BigKeyReport from './BigKeyReport.vue'
 import HotKeyStats from './HotKeyStats.vue'
 
 const props = defineProps<{ connId: string; db: number }>()
 
 const { t } = useI18n()
+const conn = useConnectionStore()
+// 集群模式的分析为全部 master 节点聚合（后端逐节点直连扫描）
+const isCluster = computed(() => conn.openTabs.find(tb => tb.id === props.connId)?.state.mode === 'cluster')
 
 const mode = ref<'overview' | 'bigkey' | 'hotkey'>('overview')
 const data = ref<KeyAnalysis | null>(null)
@@ -44,6 +49,27 @@ const avgSize = computed(() => {
   if (!data.value || !data.value.scanned) return 0
   return Math.round(data.value.totalMemory / data.value.scanned)
 })
+
+// 导出当前分析结果（JSON 原始结构 / CSV 分区表）
+function onExport({ key }: { key: string }) {
+  const d = data.value
+  if (!d) return
+  if (key === 'json') {
+    exportReport('zp-rdm-analysis.json', JSON.stringify(d, null, 2) + '\n', t('analysis.exportDone'))
+    return
+  }
+  const csv = [
+    csvSection('Summary', ['total_keys', 'scanned', 'total_memory_bytes', 'truncated'],
+      [[d.totalKeys, d.scanned, d.totalMemory, d.truncated ? 1 : 0]]),
+    csvSection('TOP Keys', ['key', 'type', 'size_bytes', 'ttl_seconds'],
+      d.topKeys.map(k => [k.key, k.type, k.size, k.ttl])),
+    csvSection('TTL Distribution', ['bucket', 'count'],
+      d.ttlBuckets.map(b => [b.label, b.count])),
+    csvSection('Prefixes', ['prefix', 'count', 'size_bytes'],
+      d.prefixes.map(p => [p.prefix, p.count, p.size])),
+  ].join('\n\n') + '\n'
+  exportReport('zp-rdm-analysis.csv', csv, t('analysis.exportDone'))
+}
 </script>
 
 <template>
@@ -81,7 +107,20 @@ const avgSize = computed(() => {
         <template #icon><ReloadOutlined /></template>
         {{ t('analysis.reanalyze') }}
       </a-button>
+      <a-dropdown v-if="data">
+        <a-button size="small">
+          <template #icon><DownloadOutlined /></template>
+          {{ t('analysis.export') }}
+        </a-button>
+        <template #overlay>
+          <a-menu @click="onExport">
+            <a-menu-item key="json">{{ t('analysis.exportJson') }}</a-menu-item>
+            <a-menu-item key="csv">{{ t('analysis.exportCsv') }}</a-menu-item>
+          </a-menu>
+        </template>
+      </a-dropdown>
       <span v-if="data" class="text-3 an-scan-info num">
+        <template v-if="isCluster">{{ t('analysis.clusterAggregated') }} · </template>
         {{ t('analysis.scannedInfo', { scanned: formatNumber(data.scanned), total: formatNumber(data.totalKeys) }) }}
         <template v-if="data.truncated">{{ t('analysis.scanTruncated') }}</template>
       </span>

@@ -2,10 +2,11 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { SearchOutlined } from '@ant-design/icons-vue'
+import { SearchOutlined, DownloadOutlined } from '@ant-design/icons-vue'
 import { BigKeyReport as fetchBigKeyReport } from '../../wailsjs/go/service/KeyService'
 import type { BigKeyReport } from '../types'
 import { formatBytes, formatTTL, formatNumber } from '../utils/format'
+import { exportReport, csvSection } from '../utils/export'
 
 const props = defineProps<{ connId: string; db: number }>()
 
@@ -39,6 +40,25 @@ onMounted(scan)
 
 const maxTopSize = computed(() => Math.max(1, data.value?.top[0]?.size ?? 1))
 const maxTypeSize = computed(() => Math.max(1, ...(data.value?.types.map(t => t.size) ?? [1])))
+
+// 导出当前报告（JSON 原始结构 / CSV 分区表）
+function onExport({ key }: { key: string }) {
+  const d = data.value
+  if (!d) return
+  if (key === 'json') {
+    exportReport('zp-rdm-bigkey-report.json', JSON.stringify(d, null, 2) + '\n', t('analysis.exportDone'))
+    return
+  }
+  const csv = [
+    csvSection('Summary', ['pattern', 'total_keys', 'scanned', 'elapsed_ms', 'truncated'],
+      [[pattern.value || '*', d.totalKeys, d.scanned, d.elapsedMs, d.truncated ? 1 : 0]]),
+    csvSection('Type Stats', ['type', 'count', 'size_bytes'],
+      d.types.map(ts => [ts.type, ts.count, ts.size])),
+    csvSection('TOP Big Keys', ['key', 'type', 'size_bytes', 'elements', 'ttl_seconds'],
+      d.top.map(k => [k.key, k.type, k.size, k.len, k.ttl])),
+  ].join('\n\n') + '\n'
+  exportReport('zp-rdm-bigkey-report.csv', csv, t('analysis.exportDone'))
+}
 </script>
 
 <template>
@@ -65,6 +85,18 @@ const maxTypeSize = computed(() => Math.max(1, ...(data.value?.types.map(t => t.
         <template #icon><SearchOutlined /></template>
         {{ t('analysis.bigkey.scan') }}
       </a-button>
+      <a-dropdown v-if="data">
+        <a-button size="small">
+          <template #icon><DownloadOutlined /></template>
+          {{ t('analysis.export') }}
+        </a-button>
+        <template #overlay>
+          <a-menu @click="onExport">
+            <a-menu-item key="json">{{ t('analysis.exportJson') }}</a-menu-item>
+            <a-menu-item key="csv">{{ t('analysis.exportCsv') }}</a-menu-item>
+          </a-menu>
+        </template>
+      </a-dropdown>
       <span v-if="data" class="text-3 bk-meta num">
         {{ t('analysis.bigkey.meta', { scanned: formatNumber(data.scanned), total: formatNumber(data.totalKeys), ms: formatNumber(data.elapsedMs) }) }}
       </span>

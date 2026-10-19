@@ -18,6 +18,11 @@ export default {
     modeOverview: '概览',
     modeBigKey: '大键报告',
     modeHotKey: '热点键',
+    export: '导出',
+    exportJson: '导出 JSON',
+    exportCsv: '导出 CSV',
+    exportDone: '已导出',
+    clusterAggregated: '已聚合全部 master 节点',
     bigkey: {
       patternTip: '键模式，如 user:*（默认全部）',
       sample: '采样 {n}',

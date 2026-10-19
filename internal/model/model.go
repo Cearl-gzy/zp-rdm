@@ -167,6 +167,28 @@ type HotKeyFreqEntry struct {
 	Freq int64  `json:"freq"` // LFU 计数（未访问过为 0）
 }
 
+// ReplicaInfo 副本节点状态（INFO replication 的 slaveN 行）
+type ReplicaInfo struct {
+	Addr   string `json:"addr"`   // ip:port
+	State  string `json:"state"`  // online / send_bulk / wait_bgsave ...
+	Offset int64  `json:"offset"` // 复制偏移
+	Lag    int64  `json:"lag"`    // 秒（副本视角的复制延迟）
+}
+
+// ReplicationInfo 主从复制拓扑（INFO replication）
+type ReplicationInfo struct {
+	Role           string        `json:"role"` // master / slave
+	Replicas       []ReplicaInfo `json:"replicas"`
+	Offset         int64         `json:"offset"`         // master_repl_offset / slave_repl_offset
+	BacklogActive  bool          `json:"backlogActive"`  // 复制积压缓冲区是否启用
+	BacklogSize    int64         `json:"backlogSize"`    // repl_backlog_size 字节
+	BacklogHistlen int64         `json:"backlogHistlen"` // 积压数据实际字节数
+	MasterAddr     string        `json:"masterAddr"`     // 副本视角：上游 master host:port
+	LinkStatus     string        `json:"linkStatus"`     // 副本视角：up / down
+	LastIOSeconds  int64         `json:"lastIOSeconds"`  // 副本视角：距上次与 master 通信秒数
+	SyncInProgress bool          `json:"syncInProgress"` // 副本视角：是否正在全量/增量同步
+}
+
 // HotKeyFreqReport OBJECT FREQ 扫描结果
 type HotKeyFreqReport struct {
 	Policy    string            `json:"policy"`    // 当前 maxmemory-policy

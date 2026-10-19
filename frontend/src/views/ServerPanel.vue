@@ -3,17 +3,21 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ServerConfig from './ServerConfig.vue'
 import AclPanel from './AclPanel.vue'
+import ReplicationPanel from './ReplicationPanel.vue'
 
-// 服务器管理面板：运行配置（CONFIG）+ ACL 用户管理（集群模式不展示此视图）
+// 服务器管理面板：复制拓扑 + 运行配置（CONFIG）+ ACL 用户管理（集群模式不展示此视图）
 const props = defineProps<{ connId: string; db: number }>()
 const { t } = useI18n()
 
-const tab = ref<'config' | 'acl'>('config')
+const tab = ref<'replication' | 'config' | 'acl'>('replication')
 </script>
 
 <template>
   <div class="server-panel">
     <a-tabs v-model:activeKey="tab" size="small" class="sp-tabs">
+      <a-tab-pane key="replication" :tab="t('serverPanel.tabReplication')">
+        <ReplicationPanel v-if="tab === 'replication'" :conn-id="props.connId" :db="props.db" />
+      </a-tab-pane>
       <a-tab-pane key="config" :tab="t('serverPanel.tabConfig')">
         <ServerConfig v-if="tab === 'config'" :conn-id="props.connId" :db="props.db" />
       </a-tab-pane>

@@ -18,6 +18,11 @@ export default {
     modeOverview: 'Overview',
     modeBigKey: 'Big Keys',
     modeHotKey: 'Hot Keys',
+    export: 'Export',
+    exportJson: 'Export JSON',
+    exportCsv: 'Export CSV',
+    exportDone: 'Exported',
+    clusterAggregated: 'aggregated across all master nodes',
     bigkey: {
       patternTip: 'Key pattern, e.g. user:* (default: all)',
       sample: 'Sample {n}',
