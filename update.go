@@ -2,20 +2,17 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"net"
-	"net/http"
 	"os"
 	"path/filepath"
-	"time"
+	"sync"
 
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"zp-rdm/internal/updatecheck"
 )
 
-// 应用内自动更新：DownloadUpdate 下载安装包（进度事件 update:download）→
-// sha256 校验 → ApplyUpdate 退出并由辅助进程提权静默安装到原目录、重启新版。
+// 应用内自动更新：DownloadUpdate 多源竞速下载安装包（进度事件 update:download）→
+// 第一个通过 sha256 校验的来源胜出 → ApplyUpdate 退出并由辅助进程提权静默安装到原目录、重启新版。
 // 仅 Windows 自动安装；其他平台仍走浏览器下载（macOS 建议 brew / Linux 包管理器）。
 
 // updateProgress 下载进度事件负载
@@ -31,126 +28,51 @@ const (
 	updateRepoName  = "zp-rdm"
 )
 
-// updateDownloadURLs 候选下载地址：先是 Release 资产直链；有资产 ID 时追加
-// API octet-stream 地址作为回退（github.com 在部分网络不可达，api.github.com 通常可用）。
-func updateDownloadURLs(info UpdateInfo) []string {
-	urls := []string{info.URL}
-	if info.assetID != 0 {
-		urls = append(urls, fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/assets/%d",
-			updateRepoOwner, updateRepoName, info.assetID))
+// updateAPIFallbackURL API octet-stream 回退地址（github.com 在部分网络不可达，
+// api.github.com 通常可用）。无资产 ID（清单通道）时为空。
+func updateAPIFallbackURL(info UpdateInfo) string {
+	if info.assetID == 0 {
+		return ""
 	}
-	return urls
-}
-
-// fetchFirstOK 依次尝试候选地址，返回第一个 HTTP 200 的响应（调用方负责 Close）。
-// 首个之后的地址按 API 资产接口对待，声明 Accept: application/octet-stream。
-func fetchFirstOK(client *http.Client, urls []string) (*http.Response, error) {
-	var lastErr error
-	for i, u := range urls {
-		if u == "" {
-			continue
-		}
-		req, err := http.NewRequest(http.MethodGet, u, nil)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if i > 0 {
-			req.Header.Set("Accept", "application/octet-stream")
-		}
-		resp, err := client.Do(req) //nolint:gosec URL 来自 Release 资产 / 编译期常量拼接
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if resp.StatusCode == http.StatusOK {
-			return resp, nil
-		}
-		lastErr = fmt.Errorf("HTTP %d", resp.StatusCode)
-		_ = resp.Body.Close()
-	}
-	if lastErr == nil {
-		lastErr = fmt.Errorf("无可用下载地址")
-	}
-	return nil, fmt.Errorf("下载失败: %w", lastErr)
-}
-
-// fetchUpdate 按候选地址下载更新包响应。
-// 连接/响应头超时收紧：首个地址（github.com）不可达时快速失败，及时回退 API 通道；
-// 整体 30 分钟覆盖慢网络大文件下载。
-func fetchUpdate(info UpdateInfo) (*http.Response, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Minute,
-		Transport: &http.Transport{
-			DialContext:           (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: 20 * time.Second,
-		},
-	}
-	return fetchFirstOK(client, updateDownloadURLs(info))
+	return fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/assets/%d",
+		updateRepoOwner, updateRepoName, info.assetID)
 }
 
 // DownloadUpdate 下载最近检查到的更新包并校验。返回本地文件路径。
+// 多源竞速：官方直链 + 公共镜像前缀（仅 github.com）+ API 回退并发下载，
+// 慢/死源由连接超时与停滞看门狗出局；产物必须通过 sha256 校验（Auto 的前提是 Sha256 非空），
+// 因此镜像只能加速、无法篡改。
 func (a *App) DownloadUpdate() (string, error) {
 	info := a.pendingUpdate
 	if !info.HasUpdate || !info.Auto {
 		return "", fmt.Errorf("当前环境不支持自动安装，请使用网页下载")
 	}
 
-	resp, err := fetchUpdate(info)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close() //nolint:errcheck
-
 	dst := filepath.Join(os.TempDir(), fmt.Sprintf("zp-rdm-update-%s.exe", info.Version))
-	f, err := os.Create(dst) //nolint:gosec 固定临时目录 + 版本号文件名
-	if err != nil {
-		return "", err
+	urls := updatecheck.RaceCandidates(info.URL, updateAPIFallbackURL(info))
+
+	// 进度回调可能被多源并发触发：互斥节流，每 ~512KB 或完成时推一次
+	var mu sync.Mutex
+	var lastEmit int64
+	onProgress := func(d, total int64) {
+		mu.Lock()
+		defer mu.Unlock()
+		if d-lastEmit >= 512*1024 || (total > 0 && d == total) {
+			lastEmit = d
+			wailsRuntime.EventsEmit(a.ctx, "update:download", updateProgress{Downloaded: d, Total: total})
+		}
 	}
-	removeOnErr := func(err error) (string, error) {
-		_ = f.Close()
+
+	if _, err := updatecheck.RaceDownload(a.ctx, urls, dst, info.Sha256, onProgress); err != nil {
 		_ = os.Remove(dst)
 		return "", err
 	}
 
-	total := resp.ContentLength // 未知时为 -1，前端按不确定进度显示
-	var downloaded int64
-	var lastEmit int64
-	buf := make([]byte, 256*1024)
-	for {
-		n, rerr := resp.Body.Read(buf)
-		if n > 0 {
-			if _, werr := f.Write(buf[:n]); werr != nil {
-				return removeOnErr(werr)
-			}
-			downloaded += int64(n)
-			d := downloaded
-			// 节流：每 ~512KB 或完成时推一次进度
-			if d-lastEmit >= 512*1024 || d == total {
-				lastEmit = d
-				wailsRuntime.EventsEmit(a.ctx, "update:download", updateProgress{Downloaded: d, Total: total})
-			}
-		}
-		if rerr == io.EOF {
-			break
-		}
-		if rerr != nil {
-			return removeOnErr(fmt.Errorf("下载中断: %w", rerr))
-		}
+	var size int64
+	if st, err := os.Stat(dst); err == nil {
+		size = st.Size()
 	}
-	if err := f.Close(); err != nil {
-		return removeOnErr(err)
-	}
-	if total > 0 && downloaded != total {
-		return removeOnErr(fmt.Errorf("下载不完整：%d / %d 字节", downloaded, total))
-	}
-
-	// sha256 校验（Auto 的前提是 Sha256 非空）
-	if err := updatecheck.VerifyFileSHA256(dst, info.Sha256); err != nil {
-		return removeOnErr(fmt.Errorf("安装包校验失败: %w", err))
-	}
-	wailsRuntime.EventsEmit(a.ctx, "update:download", updateProgress{Downloaded: downloaded, Total: total, Done: true})
+	wailsRuntime.EventsEmit(a.ctx, "update:download", updateProgress{Downloaded: size, Total: size, Done: true})
 	a.updateFile = dst
 	return dst, nil
 }
