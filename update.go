@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -75,8 +76,17 @@ func fetchFirstOK(client *http.Client, urls []string) (*http.Response, error) {
 }
 
 // fetchUpdate 按候选地址下载更新包响应。
+// 连接/响应头超时收紧：首个地址（github.com）不可达时快速失败，及时回退 API 通道；
+// 整体 30 分钟覆盖慢网络大文件下载。
 func fetchUpdate(info UpdateInfo) (*http.Response, error) {
-	client := &http.Client{Timeout: 30 * time.Minute} // 大文件慢网络，超时放宽
+	client := &http.Client{
+		Timeout: 30 * time.Minute,
+		Transport: &http.Transport{
+			DialContext:           (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 20 * time.Second,
+		},
+	}
 	return fetchFirstOK(client, updateDownloadURLs(info))
 }
 
