@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.13.0-red)
+![version](https://img.shields.io/badge/version-1.14.0-red)
 
 ---
 
@@ -66,6 +66,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 键分析 | TOP Keys、TTL 分布、前缀内存聚合 |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
 | 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
+| 服务器管理 | CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
@@ -138,6 +139,12 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 - **SLOWLOG** — 慢查询列表（耗时/命令/时间/客户端），阈值说明，一键清空
 - **Pub/Sub** — 任意频道订阅，消息流实时滚动，支持模式订阅（psubscribe）
+
+### 🛠️ 服务器管理
+
+- **运行配置** — `CONFIG GET` 全参数搜索表（20+ 常用参数中文说明），`CONFIG SET` 图形化修改（高风险参数二次确认），一键 `CONFIG REWRITE` 持久化
+- **ACL 用户管理** — 用户列表（状态/键/命令/频道/密码数），抽屉式规则编辑：on/off、nopass、密码设置/清除、键模式、命令类别、频道模式 + 附加原始规则，最终规则实时预览；default 用户修改强确认、防误删
+- **已知限制**：集群模式不支持（配置/ACL 不跨节点同步，请用 CLI 逐节点操作）；哨兵模式作用在 master 上可用
 
 ### 📦 数据迁移
 

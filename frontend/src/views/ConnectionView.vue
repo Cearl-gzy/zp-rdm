@@ -12,9 +12,11 @@ import SlowLog from './SlowLog.vue'
 import PubSub from './PubSub.vue'
 import SearchPanel from './SearchPanel.vue'
 import ClusterPanel from './ClusterPanel.vue'
+import ServerPanel from './ServerPanel.vue'
 import {
   DatabaseOutlined, DashboardOutlined, CodeOutlined,
   HistoryOutlined, NotificationOutlined, PieChartOutlined, SearchOutlined, ClusterOutlined,
+  SettingOutlined,
 } from '@ant-design/icons-vue'
 import { useI18n } from 'vue-i18n'
 
@@ -31,7 +33,9 @@ const isCluster = computed(() => props.state.mode === 'cluster')
 const views = computed(() => {
   const base = ['data', 'analysis']
   if (isCluster.value) base.push('cluster')
-  base.push('info', 'cli', 'slowlog', 'pubsub')
+  base.push('info')
+  if (!isCluster.value) base.push('server') // 配置/ACL 不支持集群（逐节点语义）
+  base.push('cli', 'slowlog', 'pubsub')
   if (hasSearch.value) base.push('search')
   return base
 })
@@ -75,6 +79,9 @@ const dbOptions = computed(() =>
           <a-segmented-option value="info">
             <span class="seg-item"><DashboardOutlined /> {{ t('connectionView.monitor') }}</span>
           </a-segmented-option>
+          <a-segmented-option v-if="!isCluster" value="server">
+            <span class="seg-item"><SettingOutlined /> {{ t('connectionView.server') }}</span>
+          </a-segmented-option>
           <a-segmented-option value="cli">
             <span class="seg-item"><CodeOutlined /> CLI</span>
           </a-segmented-option>
@@ -110,6 +117,7 @@ const dbOptions = computed(() =>
       <KeyAnalysis v-if="activeView === 'analysis'" :conn-id="connId" :db="db" />
       <ClusterPanel v-if="activeView === 'cluster'" :conn-id="connId" />
       <ServerInfo v-if="activeView === 'info'" :conn-id="connId" :db="db" />
+      <ServerPanel v-if="activeView === 'server'" :conn-id="connId" :db="db" />
       <CliTerminal v-show="activeView === 'cli'" :conn-id="connId" :db="db" />
       <SlowLog v-if="activeView === 'slowlog'" :conn-id="connId" :db="db" />
       <PubSub v-if="activeView === 'pubsub'" :conn-id="connId" :db="db" />

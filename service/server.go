@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -182,6 +183,9 @@ func (s *ServerService) KillClient(connID string, db int, addr string) error {
 
 // GetConfig 配置查询
 func (s *ServerService) GetConfig(connID string, db int, pattern string) (map[string]string, error) {
+	if s.manager.IsCluster(connID) {
+		return nil, errClusterUnsupported
+	}
 	c, err := s.cli(connID, db)
 	if err != nil {
 		return nil, err
@@ -190,6 +194,34 @@ func (s *ServerService) GetConfig(connID string, db int, pattern string) (map[st
 		pattern = "*"
 	}
 	return c.ConfigGet(s.ctx, pattern).Result()
+}
+
+// SetConfig 修改运行参数（CONFIG SET，不落盘，重启失效——持久化需 CONFIG REWRITE）
+func (s *ServerService) SetConfig(connID string, db int, param, value string) error {
+	if s.manager.IsCluster(connID) {
+		return errClusterUnsupported
+	}
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return err
+	}
+	param = strings.TrimSpace(param)
+	if param == "" {
+		return errors.New("参数名不能为空")
+	}
+	return c.ConfigSet(s.ctx, param, value).Err()
+}
+
+// ConfigRewrite 把当前运行配置写回配置文件（CONFIG REWRITE）
+func (s *ServerService) ConfigRewrite(connID string, db int) error {
+	if s.manager.IsCluster(connID) {
+		return errClusterUnsupported
+	}
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return err
+	}
+	return c.Do(s.ctx, "CONFIG", "REWRITE").Err()
 }
 
 // Publish 发布消息

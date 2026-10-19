@@ -4,6 +4,7 @@ export default {
     analysis: '分析',
     cluster: '集群',
     monitor: '监控',
+    server: '服务器',
     slowlog: '慢日志',
     pubsub: '发布订阅',
     search: '搜索',

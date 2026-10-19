@@ -184,6 +184,16 @@ export interface CliResult {
 
 export type InfoMap = Record<string, Record<string, string>>
 
+export interface AclUserInfo {
+  name: string
+  enabled: boolean
+  noPass: boolean
+  passwords: number
+  commands: string
+  keys: string
+  channels: string
+}
+
 export interface UpdateInfo {
   hasUpdate: boolean
   version: string

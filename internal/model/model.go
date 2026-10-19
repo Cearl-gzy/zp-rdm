@@ -250,6 +250,17 @@ type StreamPendingEntry struct {
 	DeliveryCount int64  `json:"deliveryCount"`
 }
 
+// AclUserInfo ACL 用户信息（ACL GETUSER 解析；密码哈希不返回值，仅计数）
+type AclUserInfo struct {
+	Name      string `json:"name"`
+	Enabled   bool   `json:"enabled"`
+	NoPass    bool   `json:"noPass"`
+	Passwords int    `json:"passwords"` // 已设置密码数量
+	Commands  string `json:"commands"`  // 如 "+@all" / "+get|+@read -@dangerous"
+	Keys      string `json:"keys"`      // 如 "~*" / "~cache:*"
+	Channels  string `json:"channels"`  // 如 "&*"
+}
+
 // ClusterNode 集群节点（CLUSTER NODES 解析）
 type ClusterNode struct {
 	ID        string   `json:"id"`
