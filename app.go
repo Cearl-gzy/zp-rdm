@@ -20,7 +20,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.12.0"
+const AppVersion = "1.13.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -32,6 +32,9 @@ type App struct {
 	Store    *store.Store
 	Manager  *redisx.Manager
 	Settings *settings.Manager
+
+	pendingUpdate UpdateInfo // 最近一次 CheckUpdate 结果（DownloadUpdate 用）
+	updateFile    string     // DownloadUpdate 下载完成的安装包路径
 
 	Connection *service.ConnectionService
 	Key        *service.KeyService
@@ -136,93 +139,120 @@ func (a *App) Version() string { return AppVersion }
 // 而 api.github.com 通常可用。
 const updateRepoAPI = "https://api.github.com/repos/Cearl-gzy/zp-rdm/releases/latest"
 
-// CheckUpdate 检查更新：优先 GitHub API，失败回退更新清单
-func (a *App) CheckUpdate() (string, error) {
-	if url, err := checkUpdateViaAPI(); err == nil {
-		return url, nil
-	}
-	url, err := checkUpdateViaManifest()
-	if err != nil {
-		return "", fmt.Errorf("无法连接更新服务器（网络受限），请稍后再试")
-	}
-	return url, nil
+// UpdateInfo 更新检查结果
+type UpdateInfo struct {
+	HasUpdate bool   `json:"hasUpdate"`
+	Version   string `json:"version"`
+	URL       string `json:"url"`
+	Sha256    string `json:"sha256"` // 安装包 sha256（自动下载校验用，可能为空）
+	Auto      bool   `json:"auto"`   // 支持应用内自动安装（Windows 且有校验哈希）
+
+	assetID int64 // Release 资产 ID（下载回退到 API octet-stream 用，API 路径专属）
 }
 
-func checkUpdateViaAPI() (string, error) {
+// CheckUpdate 检查更新：优先 GitHub API，失败回退更新清单
+func (a *App) CheckUpdate() (UpdateInfo, error) {
+	if info, err := checkUpdateViaAPI(); err == nil {
+		a.pendingUpdate = info
+		return info, nil
+	}
+	info, err := checkUpdateViaManifest()
+	if err != nil {
+		return UpdateInfo{}, fmt.Errorf("无法连接更新服务器（网络受限），请稍后再试")
+	}
+	a.pendingUpdate = info
+	return info, nil
+}
+
+// newUpdateInfo 构造结果：仅远端版本更高才提示；Auto 限 Windows + 有 sha256
+func newUpdateInfo(ver, url, sha256 string) UpdateInfo {
+	info := UpdateInfo{Version: ver, URL: url, Sha256: sha256}
+	if ver == "" || updatecheck.CompareSemver(ver, AppVersion) <= 0 {
+		return info // HasUpdate=false
+	}
+	info.HasUpdate = true
+	info.Auto = runtime.GOOS == "windows" && sha256 != ""
+	return info
+}
+
+func checkUpdateViaAPI() (UpdateInfo, error) {
 	client := &http.Client{Timeout: 8 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, updateRepoAPI, nil)
 	if err != nil {
-		return "", err
+		return UpdateInfo{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	resp, err := client.Do(req) //nolint:gosec 地址为编译期常量
 	if err != nil {
-		return "", err
+		return UpdateInfo{}, err
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API 状态码 %d", resp.StatusCode)
+		return UpdateInfo{}, fmt.Errorf("API 状态码 %d", resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return "", err
+		return UpdateInfo{}, err
 	}
 	var rel struct {
 		TagName string `json:"tag_name"`
 		HTMLURL string `json:"html_url"`
 		Assets  []struct {
+			ID                 int64  `json:"id"`
 			Name               string `json:"name"`
 			BrowserDownloadURL string `json:"browser_download_url"`
+			Digest             string `json:"digest"` // "sha256:…"（GitHub 按存储对象计算）
 		} `json:"assets"`
 	}
 	if err := json.Unmarshal(body, &rel); err != nil {
-		return "", err
+		return UpdateInfo{}, err
 	}
 	ver := strings.TrimPrefix(rel.TagName, "v")
-	if ver == "" || ver == AppVersion {
-		return "", nil // 已是最新
-	}
 	for _, as := range rel.Assets {
 		if updatecheck.MatchAsset(runtime.GOOS, as.Name) {
-			return as.BrowserDownloadURL, nil
+			info := newUpdateInfo(ver, as.BrowserDownloadURL, as.Digest)
+			info.assetID = as.ID
+			return info, nil
 		}
 	}
 	if rel.HTMLURL != "" {
-		return rel.HTMLURL, nil
+		return newUpdateInfo(ver, rel.HTMLURL, ""), nil
 	}
-	return "", fmt.Errorf("Release 中未找到安装包")
+	return UpdateInfo{}, fmt.Errorf("Release 中未找到安装包")
 }
 
-func checkUpdateViaManifest() (string, error) {
+func checkUpdateViaManifest() (UpdateInfo, error) {
 	if updateManifestURL == "" {
-		return "", fmt.Errorf("未配置更新源")
+		return UpdateInfo{}, fmt.Errorf("未配置更新源")
 	}
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Get(updateManifestURL) //nolint:gosec 地址为编译期常量
 	if err != nil {
-		return "", err
+		return UpdateInfo{}, err
 	}
 	defer resp.Body.Close() //nolint:errcheck
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return "", err
+		return UpdateInfo{}, err
 	}
 	var manifest struct {
 		Version   string            `json:"version"`
 		URL       string            `json:"url"`
 		Platforms map[string]string `json:"platforms"`
+		Sha256    map[string]string `json:"sha256"` // 与 platforms 同键的哈希表（v1.13.0 起 CI 生成）
 	}
 	if err := json.Unmarshal(body, &manifest); err != nil {
-		return "", fmt.Errorf("更新清单格式错误")
-	}
-	if manifest.Version == "" || manifest.Version == AppVersion {
-		return "", nil // 已是最新
+		return UpdateInfo{}, fmt.Errorf("更新清单格式错误")
 	}
 	url := updatecheck.PickManifestURL(runtime.GOOS, runtime.GOARCH, manifest.URL, manifest.Platforms)
-	if url == "" {
-		return "", fmt.Errorf("更新清单缺少当前平台的下载地址")
+	if url == "" && manifest.Version != AppVersion {
+		return UpdateInfo{}, fmt.Errorf("更新清单缺少当前平台的下载地址")
 	}
-	return url, nil
+	sha := manifest.Sha256[runtime.GOOS+"/"+runtime.GOARCH]
+	if sha == "" {
+		sha = manifest.Sha256[runtime.GOOS+"/universal"]
+	}
+	return newUpdateInfo(manifest.Version, url, sha), nil
 }
 
 // PickOpenFile 打开文件选择对话框

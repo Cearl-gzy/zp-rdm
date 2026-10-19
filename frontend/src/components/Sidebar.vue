@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, h } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   PlusOutlined, SearchOutlined, BulbOutlined, BulbFilled,
@@ -7,15 +7,16 @@ import {
   LoadingOutlined, MoreOutlined, ControlOutlined, ThunderboltOutlined,
   CloudSyncOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons-vue'
-import { PickOpenFile, PickSaveFile, CheckUpdate } from '../../wailsjs/go/main/App'
+import { PickOpenFile, PickSaveFile, CheckUpdate, DownloadUpdate, ApplyUpdate } from '../../wailsjs/go/main/App'
 import { BrowserOpenURL, Environment } from '../../wailsjs/runtime/runtime'
 import { useI18n } from 'vue-i18n'
 import { setLocale, localeOptions } from '../i18n'
 import { useAppStore } from '../stores/app'
 import { useConnectionStore } from '../stores/connection'
 import { onAppEvent, AppEvents } from '../utils/events'
-import type { ConnectionProfile } from '../types'
+import type { ConnectionProfile, UpdateInfo } from '../types'
 import ConnectionForm from './ConnectionForm.vue'
+import UpdateProgress from './UpdateProgress.vue'
 
 const app = useAppStore()
 const conn = useConnectionStore()
@@ -147,23 +148,70 @@ onMounted(async () => {
 async function onCheckUpdate() {
   checking.value = true
   try {
-    const url = await CheckUpdate()
-    if (url) {
+    const info = (await CheckUpdate()) as unknown as UpdateInfo
+    if (!info.hasUpdate) {
+      message.success(t('sidebar.alreadyLatest'))
+      return
+    }
+    if (info.auto) {
+      // Windows + 有校验哈希 → 应用内自动下载安装
+      Modal.confirm({
+        title: t('sidebar.updateTitle'),
+        content: t('sidebar.updateAutoContent', { ver: info.version }),
+        okText: t('sidebar.updateAutoOk'),
+        cancelText: t('common.cancel'),
+        onOk: () => runAutoUpdate(),
+      })
+    } else {
       Modal.confirm({
         title: t('sidebar.updateTitle'),
         content: t('sidebar.updateContent'),
         okText: t('sidebar.updateOk'),
         cancelText: t('common.cancel'),
-        onOk: () => BrowserOpenURL(url),
+        onOk: () => BrowserOpenURL(info.url),
       })
-    } else {
-      message.success(t('sidebar.alreadyLatest'))
     }
   } catch (e: any) {
     message.warning(String(e?.message ?? e))
   } finally {
     checking.value = false
   }
+}
+
+// 自动更新：进度弹窗 → 下载+校验 → 确认重启 → ApplyUpdate 退出并静默安装
+function runAutoUpdate() {
+  const inst = Modal.info({
+    title: t('sidebar.updateDownloading'),
+    content: h(UpdateProgress, {
+      verifyingText: t('sidebar.updateVerifying'),
+      onDone: () => {
+        inst.destroy()
+        Modal.confirm({
+          title: t('sidebar.updateReady'),
+          content: t('sidebar.updateReadyContent'),
+          okText: t('sidebar.updateRestart'),
+          cancelText: t('common.cancel'),
+          onOk: async () => {
+            try {
+              await ApplyUpdate()
+              // 应用随即自动退出；若退出失败给出提示
+            } catch (e: any) {
+              message.error(String(e?.message ?? e))
+            }
+          },
+        })
+      },
+    }),
+    // AntDV 类型未暴露 style，但运行时支持（隐藏 OK 按钮，进度完成自动关闭）
+    okButtonProps: { style: 'display: none' } as any,
+    closable: false,
+    maskClosable: false,
+    keyboard: false,
+  })
+  DownloadUpdate().catch((e: any) => {
+    inst.destroy()
+    message.error(t('sidebar.updateFailed') + ': ' + String(e?.message ?? e))
+  })
 }
 </script>
 

@@ -192,11 +192,15 @@ jobs:
           merge-multiple: true
 
       # 更新清单：应用内 CheckUpdate 轮询固定地址 releases/latest/download/latest.json
-      # 顶层 url 保留 Windows 安装包地址（老版本客户端兼容），platforms 供多平台选择
+      # 顶层 url 保留 Windows 安装包地址（老版本客户端兼容），platforms 供多平台选择；
+      # sha256 表（与 platforms 同键）供应用内自动下载后校验（v1.13.0 起）
       - name: Generate update manifest
         run: |
           TAG="${{ github.ref_name }}"
           BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
+          SHA_WIN="$(sha256sum dist/zp-rdm-amd64-installer.exe | cut -d' ' -f1)"
+          SHA_MAC="$(sha256sum dist/zp-rdm-darwin-universal.zip | cut -d' ' -f1)"
+          SHA_LINUX="$(sha256sum dist/zp-rdm-linux-amd64.tar.gz | cut -d' ' -f1)"
           cat > dist/latest.json <<EOF
           {
             "version": "${TAG#v}",
@@ -205,6 +209,11 @@ jobs:
               "windows/amd64": "${BASE}/zp-rdm-amd64-installer.exe",
               "darwin/universal": "${BASE}/zp-rdm-darwin-universal.zip",
               "linux/amd64": "${BASE}/zp-rdm-linux-amd64.tar.gz"
+            },
+            "sha256": {
+              "windows/amd64": "${SHA_WIN}",
+              "darwin/universal": "${SHA_MAC}",
+              "linux/amd64": "${SHA_LINUX}"
             }
           }
           EOF

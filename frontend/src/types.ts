@@ -180,3 +180,11 @@ export interface CliResult {
 }
 
 export type InfoMap = Record<string, Record<string, string>>
+
+export interface UpdateInfo {
+  hasUpdate: boolean
+  version: string
+  url: string
+  sha256: string
+  auto: boolean
+}
