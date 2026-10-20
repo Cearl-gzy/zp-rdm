@@ -22,7 +22,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.16.0"
+const AppVersion = "1.17.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -278,6 +278,14 @@ func (a *App) PickSaveFile(title, defaultFilename string) (string, error) {
 			{DisplayName: "所有文件", Pattern: "*.*"},
 		},
 	})
+}
+
+// AuditDates 列出有写命令审计日志的日期（YYYY-MM-DD，新→旧）
+func (a *App) AuditDates() []string { return redisx.AuditDates() }
+
+// AuditRead 读取某天的审计日志（倒序，新记录在前，上限 2000 行）
+func (a *App) AuditRead(date string) ([]redisx.AuditEntry, error) {
+	return redisx.AuditRead(date, 2000)
 }
 
 // SaveTextFile 把文本内容写入指定文件（分析报告导出等；UTF-8，覆盖写）

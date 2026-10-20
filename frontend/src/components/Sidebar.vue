@@ -5,7 +5,7 @@ import {
   PlusOutlined, SearchOutlined, BulbOutlined, BulbFilled,
   ImportOutlined, ExportOutlined, DatabaseOutlined,
   LoadingOutlined, MoreOutlined, ControlOutlined, ThunderboltOutlined,
-  CloudSyncOutlined, SafetyCertificateOutlined, LockOutlined,
+  CloudSyncOutlined, SafetyCertificateOutlined, LockOutlined, FileProtectOutlined,
 } from '@ant-design/icons-vue'
 import { PickOpenFile, PickSaveFile, CheckUpdate, DownloadUpdate, ApplyUpdate } from '../../wailsjs/go/main/App'
 import { BrowserOpenURL, Environment } from '../../wailsjs/runtime/runtime'
@@ -18,6 +18,7 @@ import { envColor } from '../utils/env'
 import type { ConnectionProfile, UpdateInfo } from '../types'
 import ConnectionForm from './ConnectionForm.vue'
 import UpdateProgress from './UpdateProgress.vue'
+import AuditViewer from './AuditViewer.vue'
 
 const app = useAppStore()
 const conn = useConnectionStore()
@@ -29,6 +30,7 @@ const keyword = ref('')
 const collapsedGroups = ref<Set<string>>(new Set())
 const formVisible = ref(false)
 const editing = ref<ConnectionProfile | null>(null)
+const auditVisible = ref(false)
 
 const filteredGroups = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
@@ -335,6 +337,11 @@ function runAutoUpdate() {
         </button>
       </a-tooltip>
       <div class="footer-actions">
+        <a-tooltip :title="t('audit.openTooltip')">
+          <button class="icon-btn" @click="auditVisible = true">
+            <FileProtectOutlined />
+          </button>
+        </a-tooltip>
         <a-tooltip :title="t('sidebar.paletteTooltip')">
           <button class="icon-btn" @click="app.togglePalette(true)">
             <ThunderboltOutlined />
@@ -352,6 +359,7 @@ function runAutoUpdate() {
     </div>
 
     <ConnectionForm v-model:open="formVisible" :profile="editing" />
+    <AuditViewer v-model:open="auditVisible" />
 
     <a-modal v-model:open="aboutVisible" :title="t('sidebar.aboutTitle')" :width="380" :footer="null">
       <div class="about-body">

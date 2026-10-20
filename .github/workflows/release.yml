@@ -9,12 +9,12 @@ permissions:
   contents: write
 
 jobs:
-  # 单元测试 + 真实 Redis 集成测试（miniredis 不支持的 DUMP/RESTORE 在此覆盖）
+  # 单元测试 + 真实 Redis 集成测试（miniredis 不支持的 DUMP/RESTORE、Vector Set 在此覆盖）
   test:
     runs-on: ubuntu-latest
     services:
       redis:
-        image: redis:7
+        image: redis:8
         ports: ['6379:6379']
         options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     steps:

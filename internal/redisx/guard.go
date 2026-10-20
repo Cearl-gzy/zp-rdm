@@ -47,6 +47,8 @@ var writeCommands = map[string]bool{
 	// stream
 	"xadd": true, "xtrim": true, "xdel": true, "xgroup": true, "xack": true,
 	"xclaim": true, "xautoclaim": true, "xsetid": true,
+	// Redis 8 vector set
+	"vadd": true, "vrem": true, "vsetattr": true,
 	// pub/sub 副作用（不改数据集，但会触发订阅方动作，只读连接一并拦截）
 	"publish": true, "spublish": true,
 	// 脚本 / 函数（可读回调用 *_RO 变体，已放行）

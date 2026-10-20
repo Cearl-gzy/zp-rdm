@@ -19,6 +19,7 @@ import ListEditor from './editors/ListEditor.vue'
 import SetEditor from './editors/SetEditor.vue'
 import ZSetEditor from './editors/ZSetEditor.vue'
 import StreamEditor from './editors/StreamEditor.vue'
+import VectorEditor from './editors/VectorEditor.vue'
 
 const props = defineProps<{ connId: string; db: number; keyName: string }>()
 const emit = defineEmits<{
@@ -217,6 +218,7 @@ function copyName() {
           <SetEditor v-else-if="detail.type === 'set'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
           <ZSetEditor v-else-if="detail.type === 'zset'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
           <StreamEditor v-else-if="detail.type === 'stream'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
+          <VectorEditor v-else-if="detail.type === 'vectorset'" :conn-id="connId" :db="db" :key-name="keyName" :total="detail.length" />
           <a-empty v-else :description="t('value.unsupportedType', { type: detail.type })" style="margin-top: 80px" />
         </template>
       </a-spin>

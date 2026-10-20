@@ -1,0 +1,21 @@
+export default {
+  audit: {
+    title: '写命令审计日志',
+    openTooltip: '审计日志',
+    date: '日期',
+    noDates: '暂无审计日志（在连接配置中开启「写命令审计」）',
+    connFilter: '连接',
+    allConns: '全部连接',
+    keyword: '搜索命令 / 参数',
+    refresh: '刷新',
+    export: '导出',
+    exported: '已导出 {n} 条',
+    colTime: '时间',
+    colConn: '连接',
+    colCmd: '命令',
+    colArgs: '参数',
+    total: '{n} 条记录',
+    empty: '当天无审计记录',
+    cappedTip: '仅显示最近 {n} 条（完整内容请导出或直接查看日志文件）',
+  },
+}

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"zp-rdm/internal/model"
 
 	"github.com/redis/go-redis/v9"
@@ -82,6 +84,43 @@ func (s *ValueService) StreamPending(connID string, db int, key, group string, c
 		})
 	}
 	return out, nil
+}
+
+// StreamAutoClaim XAUTOCLAIM：把闲置超 minIdleMs 的 pending 条目转移给 consumer。
+// 返回被认领的条目内容（含字段值），便于认领后直接查看。
+func (s *ValueService) StreamAutoClaim(connID string, db int, key, group, consumer string, minIdleMs int64, start string, count int64) ([]model.StreamItem, string, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return nil, "", err
+	}
+	if start == "" {
+		start = "0"
+	}
+	if count <= 0 || count > 100 {
+		count = 100
+	}
+	msgs, nextStart, err := c.XAutoClaim(s.ctx, &redis.XAutoClaimArgs{
+		Stream:   key,
+		Group:    group,
+		Consumer: consumer,
+		MinIdle:  time.Duration(minIdleMs) * time.Millisecond,
+		Start:    start,
+		Count:    count,
+	}).Result()
+	if err != nil {
+		return nil, "", err
+	}
+	items := make([]model.StreamItem, 0, len(msgs))
+	for _, m := range msgs {
+		fields := make(map[string]string, len(m.Values))
+		for k, v := range m.Values {
+			if sv, ok := v.(string); ok {
+				fields[k] = sv
+			}
+		}
+		items = append(items, model.StreamItem{ID: m.ID, Fields: fields})
+	}
+	return items, nextStart, nil
 }
 
 // StreamAck 确认条目（XACK），返回确认条数

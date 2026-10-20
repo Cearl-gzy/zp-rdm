@@ -86,15 +86,24 @@ const PAGE_SIZE = 500
 
 const treeData = computed<KeyNode[]>(() => buildKeyTree(keys.value, delimiter.value))
 
-const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream', 'ReJSON-RL']
+const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream', 'ReJSON-RL', 'vectorset']
 
-// 新建键可选类型：ReJSON-RL 模块加载时才提供 json（CreateKey 用 'json' 分支）
+// 新建键可选类型：ReJSON-RL 模块加载时才提供 json（CreateKey 用 'json' 分支）；
+// vectorset 仅 Redis 8+ 支持（按服务端版本探测）
 const hasJsonModule = computed(() =>
   (conn.openTabs.find(tab => tab.id === props.connId)?.state?.modules ?? []).some(m => /rejson/i.test(m)),
 )
-const createTypes = computed(() =>
-  hasJsonModule.value ? ['string', 'hash', 'list', 'set', 'zset', 'stream', 'json'] : keyTypes.slice(0, 6),
-)
+const hasVector = computed(() => {
+  const v = conn.openTabs.find(tab => tab.id === props.connId)?.state?.version ?? ''
+  const major = parseInt(v.split('.')[0], 10)
+  return Number.isFinite(major) && major >= 8
+})
+const createTypes = computed(() => {
+  const base = ['string', 'hash', 'list', 'set', 'zset', 'stream']
+  if (hasVector.value) base.push('vectorset')
+  if (hasJsonModule.value) base.push('json')
+  return base
+})
 const jsonExample = '{"a": 1}'
 
 async function scan(reset = false) {
@@ -645,8 +654,11 @@ const listColumns = computed(() => [
         <a-form-item v-if="['hash', 'stream'].includes(createForm.type)" :label="t('keyBrowser.fieldName')">
           <a-input v-model:value="createForm.field" placeholder="field" class="mono" />
         </a-form-item>
-        <a-form-item :label="createForm.type === 'zset' ? t('keyBrowser.member') : createForm.type === 'string' ? t('common.value') : createForm.type === 'json' ? t('keyBrowser.jsonDoc') : t('keyBrowser.initialValue')">
-          <a-textarea v-model:value="createForm.value" :rows="3" class="mono" :placeholder="createForm.type === 'json' ? jsonExample : ''" />
+        <a-form-item v-if="createForm.type === 'vectorset'" :label="t('vector.elementName')">
+          <a-input v-model:value="createForm.field" placeholder="item-1" class="mono" />
+        </a-form-item>
+        <a-form-item :label="createForm.type === 'zset' ? t('keyBrowser.member') : createForm.type === 'string' ? t('common.value') : createForm.type === 'json' ? t('keyBrowser.jsonDoc') : createForm.type === 'vectorset' ? t('vector.vectorJson') : t('keyBrowser.initialValue')">
+          <a-textarea v-model:value="createForm.value" :rows="3" class="mono" :placeholder="createForm.type === 'json' ? jsonExample : createForm.type === 'vectorset' ? '[0.1, 0.2, 0.3]' : ''" />
         </a-form-item>
         <a-form-item v-if="createForm.type === 'zset'" :label="t('keyBrowser.scoreLabel')">
           <a-input-number v-model:value="createForm.score" style="width: 100%" />

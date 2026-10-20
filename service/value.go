@@ -99,6 +99,9 @@ func (s *ValueService) GetValue(connID string, db int, key string) (*model.Value
 		if info, err := c.XInfoStream(ctx, key).Result(); err == nil {
 			d.Length = info.Length
 		}
+	case "vectorset":
+		// Redis 8 向量集合：元素数走 VCARD
+		d.Length, _ = c.Do(ctx, "VCARD", key).Int64()
 	}
 	return d, nil
 }
@@ -536,6 +539,38 @@ func (s *ValueService) StreamGet(connID string, db int, key string, count int64,
 	return &model.ScanItems{Total: total, Items: items}, nil
 }
 
+// StreamRange XRANGE 按 ID 区间查询（start/end 支持 "1-0"、"1730000000000-0"、"-"、"+"）
+func (s *ValueService) StreamRange(connID string, db int, key, start, end string, count int64) ([]model.StreamItem, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return nil, err
+	}
+	if start == "" {
+		start = "-"
+	}
+	if end == "" {
+		end = "+"
+	}
+	if count <= 0 || count > 500 {
+		count = 100
+	}
+	msgs, err := c.XRangeN(s.ctx, key, start, end, count).Result()
+	if err != nil {
+		return nil, err
+	}
+	items := make([]model.StreamItem, 0, len(msgs))
+	for _, m := range msgs {
+		fields := make(map[string]string, len(m.Values))
+		for k, v := range m.Values {
+			if sv, ok := v.(string); ok {
+				fields[k] = sv
+			}
+		}
+		items = append(items, model.StreamItem{ID: m.ID, Fields: fields})
+	}
+	return items, nil
+}
+
 // StreamAdd 添加条目（fields 为扁平 "k=v" 列表的 JSON 友好形式：map）
 func (s *ValueService) StreamAdd(connID string, db int, key string, fields map[string]string) (string, error) {
 	c, err := s.cli(connID, db)
@@ -601,6 +636,23 @@ func (s *ValueService) CreateKey(connID string, db int, key, typ, value, field s
 			return fmt.Errorf("JSON 格式不合法")
 		}
 		if err := c.Do(ctx, "JSON.SET", key, "$", value).Err(); err != nil {
+			return err
+		}
+	case "vectorset":
+		// value 为 JSON 数组（如 [0.1,0.2]），field 为元素名
+		var vec []float64
+		if err := json.Unmarshal([]byte(value), &vec); err != nil || len(vec) == 0 {
+			return fmt.Errorf("向量需为 JSON 数组（如 [0.1, 0.2, ...]）")
+		}
+		if field == "" {
+			field = "e1"
+		}
+		args := []interface{}{"VADD", key, "VALUES", len(vec)}
+		for _, v := range vec {
+			args = append(args, v)
+		}
+		args = append(args, field)
+		if _, err := c.Do(ctx, args...).Bool(); err != nil {
 			return err
 		}
 	default:

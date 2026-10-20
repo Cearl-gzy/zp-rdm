@@ -2,8 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, ReloadOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusCircleOutlined, TeamOutlined, CheckOutlined } from '@ant-design/icons-vue'
-import { StreamGet, StreamAdd, StreamDel, StreamGroups, StreamConsumers, StreamPending, StreamAck, StreamGroupCreate, StreamGroupDestroy, StreamConsumerDelete } from '../../../wailsjs/go/service/ValueService'
+import { PlusOutlined, ReloadOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusCircleOutlined, TeamOutlined, CheckOutlined, SwapOutlined } from '@ant-design/icons-vue'
+import { StreamGet, StreamAdd, StreamDel, StreamGroups, StreamConsumers, StreamPending, StreamAck, StreamGroupCreate, StreamGroupDestroy, StreamConsumerDelete, StreamRange, StreamAutoClaim } from '../../../wailsjs/go/service/ValueService'
 import { useReadonly } from '../../utils/readonly'
 import type { StreamItem, ScanItems, StreamGroup, StreamConsumer, StreamPendingEntry } from '../../types'
 
@@ -35,6 +35,34 @@ onMounted(load)
 
 function toggleOrder() {
   rev.value = !rev.value
+  load()
+}
+
+// ---------- XRANGE 区间查询 ----------
+const rangeMode = ref(false)
+const rangeStart = ref('')
+const rangeEnd = ref('')
+const rangeLoading = ref(false)
+
+async function runRange() {
+  rangeLoading.value = true
+  try {
+    items.value = ((await StreamRange(
+      props.connId, props.db, props.keyName,
+      rangeStart.value.trim(), rangeEnd.value.trim(), count.value,
+    )) as unknown as StreamItem[]) || []
+    rangeMode.value = true
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    rangeLoading.value = false
+  }
+}
+
+function clearRange() {
+  rangeMode.value = false
+  rangeStart.value = ''
+  rangeEnd.value = ''
   load()
 }
 
@@ -260,8 +288,44 @@ const pendingColumns = computed(() => [
   { title: t('stream.consumers'), dataIndex: 'consumer', key: 'consumer' },
   { title: t('stream.idle'), dataIndex: 'idleMs', key: 'idleMs', width: 90 },
   { title: t('stream.deliveryCount'), dataIndex: 'deliveryCount', key: 'deliveryCount', width: 80 },
-  { title: t('common.actions'), key: 'ops', width: 70 },
+  { title: t('common.actions'), key: 'ops', width: 96 },
 ])
+
+// ---------- XAUTOCLAIM 认领 pending ----------
+const claimVisible = ref(false)
+const claimEntry = ref<StreamPendingEntry | null>(null)
+const claimConsumer = ref('')
+const claimMinIdle = ref(0)
+const claiming = ref(false)
+
+function openClaim(entry: StreamPendingEntry) {
+  claimEntry.value = entry
+  claimConsumer.value = ''
+  // 默认门槛=该条目已空闲时长，保证立刻可认领
+  claimMinIdle.value = 0
+  claimVisible.value = true
+}
+
+async function doClaim() {
+  if (!claimConsumer.value.trim()) { message.warning(t('stream.claimConsumerRequired')); return }
+  if (!claimEntry.value) return
+  claiming.value = true
+  try {
+    // 从该条目 ID 起认领 1 条（XAUTOCLAIM 语义：转移所有权给目标消费者）
+    const [claimed] = (await StreamAutoClaim(
+      props.connId, props.db, props.keyName, pdGroup.value,
+      claimConsumer.value.trim(), claimMinIdle.value, claimEntry.value.id, 1,
+    )) as unknown as [StreamItem[], string]
+    message.success(t('stream.claimedN', { n: claimed?.length ?? 0 }))
+    claimVisible.value = false
+    loadPending()
+    loadGroups()
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    claiming.value = false
+  }
+}
 
 function idleText(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -302,6 +366,17 @@ function idleText(ms: number): string {
         {{ t('stream.consumerGroups') }}
       </a-button>
       <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('stream.totalEntries', { n: total }) }}</span>
+    </div>
+
+    <!-- XRANGE 区间查询 -->
+    <div class="range-bar">
+      <span class="text-3" style="font-size: 11.5px">{{ t('stream.rangeQuery') }}</span>
+      <a-input v-model:value="rangeStart" size="small" class="mono" :placeholder="t('stream.rangeStart')" style="width: 170px" @press-enter="runRange" />
+      <span class="text-3">→</span>
+      <a-input v-model:value="rangeEnd" size="small" class="mono" :placeholder="t('stream.rangeEnd')" style="width: 170px" @press-enter="runRange" />
+      <a-button size="small" :loading="rangeLoading" @click="runRange">{{ t('vector.run') }}</a-button>
+      <a-button v-if="rangeMode" size="small" type="link" @click="clearRange">{{ t('stream.rangeClear') }}</a-button>
+      <a-tag v-if="rangeMode" color="processing" class="range-tag">{{ t('stream.rangeActive') }}</a-tag>
     </div>
 
     <div class="ce-table">
@@ -434,6 +509,11 @@ function idleText(ms: number): string {
               <span v-else>{{ record.deliveryCount }}</span>
             </template>
             <template v-else-if="column.key === 'ops'">
+              <a-tooltip :title="t('stream.claimTooltip')">
+                <a-button size="small" type="text" :disabled="ro" @click="openClaim(record)">
+                  <template #icon><SwapOutlined /></template>
+                </a-button>
+              </a-tooltip>
               <a-tooltip :title="t('stream.ackTooltip')">
                 <a-button size="small" type="text" :disabled="ro" @click="ack([record.id])">
                   <template #icon><CheckOutlined /></template>
@@ -444,6 +524,29 @@ function idleText(ms: number): string {
         </a-table>
       </a-drawer>
     </a-drawer>
+
+    <!-- XAUTOCLAIM 认领 -->
+    <a-modal
+      v-model:open="claimVisible"
+      :title="t('stream.claimTitle')"
+      width="440px"
+      :confirm-loading="claiming"
+      :ok-text="t('stream.claimRun')" :cancel-text="t('common.cancel')"
+      @ok="doClaim"
+    >
+      <a-form layout="vertical" size="small">
+        <a-form-item :label="t('stream.messageId')">
+          <a-input :value="claimEntry?.id" disabled class="mono" />
+        </a-form-item>
+        <a-form-item :label="t('stream.claimConsumer')" required>
+          <a-input v-model:value="claimConsumer" class="mono" :placeholder="t('stream.claimConsumerPlaceholder')" />
+        </a-form-item>
+        <a-form-item :label="t('stream.claimMinIdle')">
+          <a-input-number v-model:value="claimMinIdle" :min="0" style="width: 100%" />
+          <div class="text-3" style="font-size: 11px; margin-top: 4px">{{ t('stream.claimMinIdleTip') }}</div>
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <!-- 新建消费组 -->
     <a-modal
@@ -486,4 +589,6 @@ function idleText(ms: number): string {
 .cg-toolbar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
 .cg-tag { margin-inline-end: 0 !important; }
 .cg-sub-table { margin: 4px 0 4px 12px; }
+.range-bar { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.range-tag { margin-inline-end: 0 !important; }
 </style>

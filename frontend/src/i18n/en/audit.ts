@@ -1,0 +1,21 @@
+export default {
+  audit: {
+    title: 'Write Command Audit Log',
+    openTooltip: 'Audit log',
+    date: 'Date',
+    noDates: 'No audit logs yet (enable "Write command audit" in the connection settings)',
+    connFilter: 'Connection',
+    allConns: 'All connections',
+    keyword: 'Search command / args',
+    refresh: 'Refresh',
+    export: 'Export',
+    exported: 'Exported {n} entries',
+    colTime: 'Time',
+    colConn: 'Connection',
+    colCmd: 'Command',
+    colArgs: 'Arguments',
+    total: '{n} entries',
+    empty: 'No audit entries on this date',
+    cappedTip: 'Showing the latest {n} entries only (export or open the log file for the full content)',
+  },
+}

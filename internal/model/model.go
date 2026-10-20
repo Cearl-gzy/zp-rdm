@@ -240,6 +240,12 @@ type ZSetItem struct {
 	Score  float64 `json:"score"`
 }
 
+// VectorSimEntry VSIM 相似度结果条目（Redis 8 Vector Set）
+type VectorSimEntry struct {
+	Element string  `json:"element"`
+	Score   float64 `json:"score"` // 相似度（0~1，越大越相似）
+}
+
 // ScanItems 带游标的集合元素
 type ScanItems struct {
 	Cursor uint64      `json:"cursor"`

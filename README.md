@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.16.0-red)
+![version](https://img.shields.io/badge/version-1.17.0-red)
 
 ---
 
@@ -67,7 +67,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
 | 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
 | 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
-| 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
+| 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、Redis 8 Vector Set 向量面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 生产安全 | 只读连接模式（客户端层拦截写命令）、环境标签着色（生产/测试/开发）、写命令审计日志 |
 | 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
@@ -81,7 +81,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 ### 🌳 数据浏览
 
 - **键树虚拟滚动** — 十万级键无压力。按分隔符（`:` `/` `.` `_` `-`）自动聚合成目录树，目录显示键数统计；树/列表双视图一键切换
-- **全类型编辑器** — String / Hash / List / Set / ZSet / Stream 均有专属编辑器，支持字段级增删改、内联编辑；Stream 额外支持**消费者组管理**（组/消费者增删、pending 待确认列表、逐条 ACK）
+- **全类型编辑器** — String / Hash / List / Set / ZSet / Stream 均有专属编辑器，支持字段级增删改、内联编辑；Stream 额外支持**消费者组管理**（组/消费者增删、pending 待确认列表、逐条 ACK）、**XRANGE 区间查询**与 **XAUTOCLAIM 待确认认领**（死信/卡死消息一键转移给消费者）
 - **CodeMirror 编辑器** — String 值支持 JSON 语法高亮、格式化、压缩
 - **二进制自动检测** — 含不可见字符的值自动切 Hex 视图，十六进制直接编辑，乱码不再困扰
 - **大值懒加载** — 超过 1MB 的 String 默认只加载前 1MB 预览，一键加载全量，避免界面卡死
@@ -121,6 +121,13 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **RediSearch 查询面板** — 独立"搜索"视图：索引下拉（FT._LIST）+ schema 字段展示（名称/类型/JSONPath）+ 完整查询语法（`@field:value`、`@age:[18 30]`、`@city:{北京}`），结果分页直达数据视图
 - **FT.CREATE 索引向导** — 图形化建索引：ON JSON/HASH、多键前缀、字段表（JSONPath/别名/类型 TEXT·TAG·NUMERIC·GEO/SORTABLE），JSONPath 末段自动填别名；索引可一键删除（可选 DD 连文档删）
 - **FT.AGGREGATE 聚合面板** — 结构化构造聚合查询：过滤条件 + GROUPBY 多字段 + 聚合器（COUNT / COUNT_DISTINCT / SUM / AVG / MIN / MAX，自动别名），动态列结果表；复杂管线（LOAD/APPLY/SORTBY）可走 CLI 原生命令
+
+### 🧭 Redis 8 向量面板（Vector Set）
+
+- **VSIM 相似查询** — 按成员（`ELE`）或原始向量（`VALUES`）检索：Top-K、EF 探索因子、`FILTER` 属性过滤表达式、`TRUTH` 精确模式（线性扫描校验 HNSW 召回质量）；结果按相似度排序，着色分数条一目了然
+- **成员管理** — `VADD` 增删成员（FP32 向量 JSON + `SETATTR` JSON 属性 + NOQUANT/Q8/BIN 量化选项，已有集合量化方式自动适配）、`VRANDMEMBER` 随机采样浏览（向量集合无遍历命令）
+- **向量与属性检视** — `VEMB` 查看近似向量（量化后为去量化值，一键复制）、`VGETATTR`/`VSETATTR` 在线编辑 JSON 属性
+- **概览** — `VINFO` 维度/量化类型/元素数/HNSW 参数徽标，`VCARD` 计数；Redis 8+ 连接新建键可选 vectorset 类型（低版本自动隐藏）
 
 ### 🌐 Redis Cluster
 
@@ -162,6 +169,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **只读连接模式** — 连接配置勾选「只读模式」后，客户端层拦截**全部写命令**（SET/DEL/EVAL/CONFIG SET/FLUSHDB…含模块写命令与容器命令写子命令）：UI 编辑器写按钮自动禁用，CLI 执行写命令直接报错"只读模式"，管道含写命令整管中止，数据迁移/导入同样被拦截。覆盖所有写入路径（go-redis Hook 实现），是防手滑护栏（未知命令默认放行），非服务端安全边界——服务端请配合 ACL `+@read`
 - **环境标签着色** — 连接可标记 生产（红）/ 测试（橙）/ 开发（绿）：侧栏连接项、标签页、视图头部全部显示彩色环境徽标，多个实例同开时一眼识别"这是生产库"
 - **写命令审计** — 连接开启审计后，所有写命令（含参数，截断 300 字符）追加记录到本地 JSONL 日志（`配置目录/zp-rdm/audit/audit-日期.jsonl`），按天滚动；审计写入失败静默忽略，绝不阻塞正常命令
+- **审计日志查看器** — 侧栏底部一键打开：按天/按连接过滤、命令与参数关键字搜索、危险命令（FLUSHALL/DEL/EVAL…）高亮、过滤视图一键导出 JSONL
 
 ### 🔐 安全与工程化
 
