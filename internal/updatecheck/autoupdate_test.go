@@ -76,12 +76,15 @@ func TestBuildUpdateCommand(t *testing.T) {
 	for _, want := range []string{
 		"$appPid = 20948",                              // 等待主进程退出
 		"Get-Process -Id $appPid",                      // 轮询进程存在性（替代易死锁的 tasklist|find 管道）
+		"while ($n -lt 600)",                           // 等待上限 5 分钟，防无限挂起
+		"if ($p.Path -and $p.Path -ne $exe) { break }", // PID 被复用成别的进程时视为已退出
 		"-Verb RunAs -Wait",                            // UAC 提权（安装器 requireAdministrator）并等待完成
 		`'/S /D=D:\Program Files\ZP\ZP Redis Manager'`, // /D 最后参数且无引号（NSIS 硬性要求）
 		`'C:\Users\x\AppData\Local\Temp\zp-rdm-update-1.14.1.exe'`,
-		`'D:\Program Files\ZP\ZP Redis Manager\zp-rdm.exe'`, // 装完启动新版
-		"Remove-Item",                                       // 清理安装包
-		"catch {}",                                          // 拒绝 UAC 时不中断，回退启动旧版
+		`'C:\Users\x\AppData\Local\Temp\zp-rdm-update-1.14.1.exe.log'`, // 每步写日志，失败可溯源
+		`'D:\Program Files\ZP\ZP Redis Manager\zp-rdm.exe'`,            // 装完启动新版
+		"Remove-Item", // 清理安装包
+		"Log ('install failed or cancelled: ' + $_.Exception.Message)", // 拒绝 UAC 时记录并回退启动旧版
 	} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("script missing %q:\n%s", want, script)
