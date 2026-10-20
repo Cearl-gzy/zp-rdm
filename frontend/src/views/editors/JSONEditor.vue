@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import { SaveOutlined, FormatPainterOutlined, CloudDownloadOutlined, EditOutlined } from '@ant-design/icons-vue'
 import { SetJSON, GetFullJSON, SetJSONPath } from '../../../wailsjs/go/service/ValueService'
 import { tryFormatJson } from '../../utils/format'
+import { useReadonly } from '../../utils/readonly'
 import CodeEditor from '../../components/CodeEditor.vue'
 
 // RedisJSON 文档编辑器（ReJSON-RL 类型）：文本 + 树形双视图，树形支持路径级编辑
@@ -19,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [] }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const text = ref(props.value)
 const saving = ref(false)
@@ -210,7 +212,7 @@ async function saveNodeEdit() {
         </a-button>
       </template>
 
-      <a-button v-if="mode === 'text'" type="primary" size="small" style="margin-left: auto" :loading="saving" @click="save">
+      <a-button v-if="mode === 'text'" type="primary" size="small" style="margin-left: auto" :loading="saving" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="save">
         <template #icon><SaveOutlined /></template>
         {{ t('common.save') }}
       </a-button>
@@ -234,7 +236,7 @@ async function saveNodeEdit() {
             <span class="jt-node">
               <span class="jt-name" :class="{ 'jt-leaf': node.isLeaf }">{{ node.title }}</span>
               <span class="jt-summary mono" :title="node.summary">{{ node.summary }}</span>
-              <a-button size="small" type="link" class="jt-edit" @click.stop="openNodeEdit(node)">
+              <a-button v-if="!ro" size="small" type="link" class="jt-edit" @click.stop="openNodeEdit(node)">
                 <template #icon><EditOutlined /></template>
               </a-button>
             </span>

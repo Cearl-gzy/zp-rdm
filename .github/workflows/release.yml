@@ -51,6 +51,17 @@ jobs:
       - name: Verify tag matches productVersion
         run: node scripts/verify-version.mjs
 
+      # 更新辅助进程 E2E：假安装器 + 生产同款 CREATE_NO_WINDOW 拉起 PowerShell 辅助脚本，
+      # 断言脚本体执行且安装器收到 /S /D=（防 v1.14.1 DETACHED_PROCESS 静默死亡回归）
+      - name: Update helper E2E
+        shell: bash
+        run: |
+          E2E_DIR="$RUNNER_TEMP/zp-e2e"
+          mkdir -p "$E2E_DIR"
+          go build -o "$E2E_DIR/fakeinstaller.exe" ./internal/updatecheck/e2e/fakeinstaller
+          go build -o "$E2E_DIR/helpertest.exe" ./internal/updatecheck/e2e/helpertest
+          "$E2E_DIR/helpertest.exe" "$E2E_DIR/fakeinstaller.exe"
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
 

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useConnectionStore } from '../stores/connection'
 import { useAppStore } from '../stores/app'
 import { onAppEvent, AppEvents } from '../utils/events'
+import { envColor } from '../utils/env'
 import type { ConnState } from '../types'
 import KeyBrowser from './KeyBrowser.vue'
 import KeyAnalysis from './KeyAnalysis.vue'
@@ -97,6 +98,14 @@ const dbOptions = computed(() =>
         </a-segmented>
       </div>
       <div class="vh-right">
+        <span
+          v-if="state.env"
+          class="meta-pill env-pill"
+          :style="{ color: envColor(state.env), borderColor: envColor(state.env) }"
+        >{{ state.env.toUpperCase() }}</span>
+        <a-tooltip v-if="state.readonly" :title="t('common.readonlyTip')">
+          <span class="meta-pill ro-pill">{{ t('common.readonly') }}</span>
+        </a-tooltip>
         <span class="meta-pill num">{{ state.version || 'unknown' }}</span>
         <span class="meta-pill">{{ state.mode }}</span>
         <template v-if="!isCluster">
@@ -143,6 +152,8 @@ const dbOptions = computed(() =>
   padding: 2px 7px;
   letter-spacing: 0.2px;
 }
+.env-pill { background: transparent; border: 1px solid; font-weight: 600; }
+.ro-pill { color: #f5a623; background: transparent; border: 1px solid #f5a623; font-weight: 600; }
 .vh-divider {
   width: 1px; height: 14px;
   background: var(--border-strong);

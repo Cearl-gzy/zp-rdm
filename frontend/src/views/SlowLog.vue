@@ -4,11 +4,13 @@ import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, ClearOutlined } from '@ant-design/icons-vue'
 import { SlowLog, SlowLogReset } from '../../wailsjs/go/service/ServerService'
+import { useReadonly } from '../utils/readonly'
 import type { SlowLogEntry } from '../types'
 import { formatTime } from '../utils/format'
 
 const props = defineProps<{ connId: string; db: number }>()
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const logs = ref<SlowLogEntry[]>([])
 const loading = ref(false)
@@ -75,7 +77,7 @@ const columns = computed(() => [
         <template #icon><ReloadOutlined /></template>
         {{ t('common.refresh') }}
       </a-button>
-      <a-button size="small" danger @click="reset">
+      <a-button size="small" danger :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="reset">
         <template #icon><ClearOutlined /></template>
         SLOWLOG RESET
       </a-button>

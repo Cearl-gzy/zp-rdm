@@ -123,7 +123,8 @@ func (m *Manager) Open(ctx context.Context, p model.ConnectionProfile) (*model.C
 	st := &model.ConnState{
 		ID: p.ID, Name: p.Name, Group: p.Group, Color: p.Color,
 		DBCount: dbCount, Version: version, Mode: mode,
-		Modules: parseModuleNames(ctx, c),
+		Modules:  parseModuleNames(ctx, c),
+		Readonly: p.Readonly, Env: p.Env,
 	}
 
 	m.mu.Lock()
@@ -178,7 +179,9 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 				return dialThroughSSH(sshCli, network, addr)
 			}
 		}
-		return redis.NewClusterClient(opts), nil
+		c := redis.NewClusterClient(opts)
+		attachGuard(c, p)
+		return c, nil
 	}
 	if p.Sentinel {
 		addrs := sentinelAddrList(p)
@@ -205,7 +208,9 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 				return dialThroughSSH(sshCli, network, addr)
 			}
 		}
-		return redis.NewFailoverClient(opts), nil
+		c := redis.NewFailoverClient(opts)
+		attachGuard(c, p)
+		return c, nil
 	}
 	opts := &redis.Options{
 		Addr:         fmt.Sprintf("%s:%d", p.Host, p.Port),
@@ -222,7 +227,9 @@ func (m *Manager) newClient(p model.ConnectionProfile, db int, sshCli *ssh.Clien
 			return dialThroughSSH(sshCli, network, addr)
 		}
 	}
-	return redis.NewClient(opts), nil
+	c := redis.NewClient(opts)
+	attachGuard(c, p)
+	return c, nil
 }
 
 // buildTLSConfig 按连接配置构建 tls.Config。

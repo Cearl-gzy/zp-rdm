@@ -33,5 +33,7 @@ export default {
     optional: '可选',
     all: '全部',
     none: '无',
+    readonly: '只读',
+    readonlyTip: '只读模式：写命令已被拦截',
   },
 }

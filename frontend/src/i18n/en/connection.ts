@@ -41,5 +41,13 @@ export default {
     privateKeyPlaceholder: 'C:\\Users\\you\\.ssh\\id_rsa or paste the key content',
     passphraseLabel: 'Key Passphrase (optional)',
     testConnection: 'Test Connection',
+    envLabel: 'Environment',
+    envNone: 'None',
+    envProd: 'Production',
+    envTest: 'Test',
+    envDev: 'Dev',
+    safetyLabel: 'Safety Guard',
+    readonlyLabel: 'Read-only mode (blocks all write commands)',
+    auditLabel: 'Write-command audit (local log file)',
   },
 }

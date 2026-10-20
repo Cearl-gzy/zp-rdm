@@ -41,5 +41,13 @@ export default {
     privateKeyPlaceholder: 'C:\\Users\\you\\.ssh\\id_rsa 或粘贴私钥内容',
     passphraseLabel: '私钥口令（可空）',
     testConnection: '测试连接',
+    envLabel: '环境标签',
+    envNone: '无',
+    envProd: '生产',
+    envTest: '测试',
+    envDev: '开发',
+    safetyLabel: '安全护栏',
+    readonlyLabel: '只读模式（拦截全部写命令）',
+    auditLabel: '写命令审计（记录到本地日志）',
   },
 }

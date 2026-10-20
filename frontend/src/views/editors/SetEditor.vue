@@ -4,11 +4,13 @@ import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { SetGet, SetAdd, SetRemove, SetUpdate } from '../../../wailsjs/go/service/ValueService'
+import { useReadonly } from '../../utils/readonly'
 import type { ScanItems } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const items = ref<string[]>([])
 const cursor = ref(0)
@@ -117,7 +119,7 @@ const columns = computed(() => [
       <a-button size="small" :loading="loading" @click="load(true)">
         <template #icon><ReloadOutlined /></template>
       </a-button>
-      <a-button size="small" type="primary" @click="openAdd">
+      <a-button size="small" type="primary" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="openAdd">
         <template #icon><PlusOutlined /></template>
         {{ t('editors.addMember') }}
       </a-button>
@@ -139,8 +141,8 @@ const columns = computed(() => [
             <span class="mono cell-value" :title="record.member">{{ record.member }}</span>
           </template>
           <template v-else-if="column.key === 'ops'">
-            <a-button size="small" type="text" @click="openEdit(record.member)"><template #icon><EditOutlined /></template></a-button>
-            <a-button size="small" type="text" danger @click="remove(record.member)"><template #icon><DeleteOutlined /></template></a-button>
+            <a-button size="small" type="text" :disabled="ro" @click="openEdit(record.member)"><template #icon><EditOutlined /></template></a-button>
+            <a-button size="small" type="text" danger :disabled="ro" @click="remove(record.member)"><template #icon><DeleteOutlined /></template></a-button>
           </template>
         </template>
       </a-table>

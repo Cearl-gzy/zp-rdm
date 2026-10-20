@@ -5,7 +5,7 @@ import {
   PlusOutlined, SearchOutlined, BulbOutlined, BulbFilled,
   ImportOutlined, ExportOutlined, DatabaseOutlined,
   LoadingOutlined, MoreOutlined, ControlOutlined, ThunderboltOutlined,
-  CloudSyncOutlined, SafetyCertificateOutlined,
+  CloudSyncOutlined, SafetyCertificateOutlined, LockOutlined,
 } from '@ant-design/icons-vue'
 import { PickOpenFile, PickSaveFile, CheckUpdate, DownloadUpdate, ApplyUpdate } from '../../wailsjs/go/main/App'
 import { BrowserOpenURL, Environment } from '../../wailsjs/runtime/runtime'
@@ -14,6 +14,7 @@ import { setLocale, localeOptions } from '../i18n'
 import { useAppStore } from '../stores/app'
 import { useConnectionStore } from '../stores/connection'
 import { onAppEvent, AppEvents } from '../utils/events'
+import { envColor } from '../utils/env'
 import type { ConnectionProfile, UpdateInfo } from '../types'
 import ConnectionForm from './ConnectionForm.vue'
 import UpdateProgress from './UpdateProgress.vue'
@@ -53,6 +54,13 @@ function toggleGroup(name: string) {
 function openForm(p?: ConnectionProfile) {
   editing.value = p ?? null
   formVisible.value = true
+}
+
+// 环境标签文本（prod/test/dev → 生产/测试/开发）
+function envLabel(env?: string): string {
+  if (!env) return ''
+  const key = 'env' + env.charAt(0).toUpperCase() + env.slice(1)
+  return t(`connection.${key}`)
 }
 
 async function onOpen(id: string) {
@@ -280,6 +288,12 @@ function runAutoUpdate() {
               <div class="conn-meta">
                 <div class="conn-name">
                   {{ p.name }}
+                  <span
+                    v-if="p.env"
+                    class="env-tag"
+                    :style="{ color: envColor(p.env), borderColor: envColor(p.env) }"
+                  >{{ envLabel(p.env) }}</span>
+                  <LockOutlined v-if="p.readonly" class="ro-lock" :title="t('common.readonly')" />
                   <LoadingOutlined v-if="conn.opening === p.id" class="conn-loading" />
                 </div>
                 <div class="conn-addr num">{{ p.host }}:{{ p.port }}{{ p.ssh?.enabled ? ' · ssh' : '' }}</div>
@@ -492,6 +506,11 @@ function runAutoUpdate() {
   display: flex; align-items: center; gap: 6px;
 }
 .conn-loading { font-size: 11px; color: var(--text-3); }
+.env-tag {
+  font-size: 10px; line-height: 1.4; padding: 0 4px;
+  border: 1px solid; border-radius: 3px; flex-shrink: 0;
+}
+.ro-lock { font-size: 11px; color: var(--text-3); flex-shrink: 0; }
 .conn-addr {
   font-size: 10.5px; color: var(--text-3);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

@@ -36,18 +36,24 @@ type ConnectionProfile struct {
 	Sentinel      bool   `json:"sentinel"`
 	MasterName    string `json:"masterName"`
 	SentinelAddrs string `json:"sentinelAddrs"` // 额外哨兵地址（每行或逗号分隔 host:port）
+	// 生产安全套件
+	Readonly bool   `json:"readonly"` // 只读模式：客户端层拦截全部写命令（UI/CLI/迁移均生效）
+	Env      string `json:"env"`      // 环境标签："" | prod | test | dev（界面着色，防误操作）
+	Audit    bool   `json:"audit"`    // 写命令审计：记录到 配置目录/zp-rdm/audit/audit-日期.jsonl
 }
 
 // ConnState 连接打开后的状态
 type ConnState struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Group   string   `json:"group"`
-	Color   string   `json:"color"`
-	DBCount int      `json:"dbCount"`
-	Version string   `json:"version"`
-	Mode    string   `json:"mode"`
-	Modules []string `json:"modules"` // 已加载模块名（MODULE LIST），如 ReJSON-RL / search
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Group    string   `json:"group"`
+	Color    string   `json:"color"`
+	DBCount  int      `json:"dbCount"`
+	Version  string   `json:"version"`
+	Mode     string   `json:"mode"`
+	Modules  []string `json:"modules"`  // 已加载模块名（MODULE LIST），如 ReJSON-RL / search
+	Readonly bool     `json:"readonly"` // 只读模式（界面禁用写操作）
+	Env      string   `json:"env"`      // 环境标签（prod/test/dev，界面着色）
 }
 
 // KeyInfo 键信息

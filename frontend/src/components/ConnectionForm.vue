@@ -22,6 +22,7 @@ function emptyProfile(): ConnectionProfile {
     tlsSkipVerify: true, tlsCaCert: '', tlsClientCert: '', tlsClientKey: '',
     db: 0, color: COLORS[0], cluster: false,
     sentinel: false, masterName: '', sentinelAddrs: '',
+    readonly: false, env: '', audit: false,
     ssh: { enabled: false, host: '', port: 22, username: '', authType: 'password', password: '', privateKey: '', passphrase: '' },
   }
 }
@@ -149,6 +150,20 @@ async function onSave() {
               {{ t('connection.sentinelMode') }}
             </a-checkbox>
           </a-form-item>
+          <div class="form-row">
+            <a-form-item :label="t('connection.envLabel')" class="flex-1">
+              <a-select v-model:value="form.env" size="small">
+                <a-select-option value="">{{ t('connection.envNone') }}</a-select-option>
+                <a-select-option value="prod">{{ t('connection.envProd') }}</a-select-option>
+                <a-select-option value="test">{{ t('connection.envTest') }}</a-select-option>
+                <a-select-option value="dev">{{ t('connection.envDev') }}</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item :label="t('connection.safetyLabel')" class="flex-2">
+              <a-checkbox v-model:checked="form.readonly">{{ t('connection.readonlyLabel') }}</a-checkbox>
+              <a-checkbox v-model:checked="form.audit" style="margin-left: 12px">{{ t('connection.auditLabel') }}</a-checkbox>
+            </a-form-item>
+          </div>
           <template v-if="form.sentinel">
             <a-form-item :label="t('connection.masterNameLabel')" required>
               <a-input v-model:value="form.masterName" placeholder="mymaster" />

@@ -4,10 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { AclUsers, AclGetUser, AclSetUser, AclDelUser } from '../../wailsjs/go/service/ServerService'
+import { useReadonly } from '../utils/readonly'
 import type { AclUserInfo } from '../types'
 
 const props = defineProps<{ connId: string; db: number }>()
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const users = ref<AclUserInfo[]>([])
 const loading = ref(false)
@@ -152,7 +154,7 @@ const columns = computed(() => [
         <template #icon><ReloadOutlined /></template>
         {{ t('serverPanel.aclRefresh') }}
       </a-button>
-      <a-button size="small" type="primary" @click="openNew">
+      <a-button size="small" type="primary" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="openNew">
         <template #icon><PlusOutlined /></template>
         {{ t('serverPanel.aclNew') }}
       </a-button>
@@ -191,12 +193,13 @@ const columns = computed(() => [
             <span class="text-3">{{ t('serverPanel.aclPwCount', { n: record.passwords }) }}</span>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-button size="small" type="link" style="padding: 0 8px 0 0" @click="openEdit(record)">
+            <a-button size="small" type="link" style="padding: 0 8px 0 0" :disabled="ro" @click="openEdit(record)">
               {{ t('serverPanel.aclEdit') }}
             </a-button>
             <a-button
               v-if="record.name !== 'default'"
               size="small" type="link" danger style="padding: 0"
+              :disabled="ro"
               @click="onDelete(record)"
             >
               {{ t('serverPanel.aclDelete') }}

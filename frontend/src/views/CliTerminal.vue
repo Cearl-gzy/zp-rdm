@@ -11,12 +11,14 @@ import { StartMonitor, StopMonitor } from '../../wailsjs/go/service/ServerServic
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
 import { REDIS_COMMANDS, REDIS_SUBCOMMANDS } from '../utils/redisCommands'
+import { useReadonly } from '../utils/readonly'
 import type { CliResult } from '../types'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{ connId: string; db: number }>()
 const app = useAppStore()
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 interface Entry {
   id: number
@@ -357,6 +359,9 @@ onMounted(() => inputRef.value?.focus())
           <div class="cand-hint">{{ t('cli.candHint') }}</div>
         </div>
         <div class="cli-input-row">
+          <a-tooltip v-if="ro" :title="t('common.readonlyTip')">
+            <span class="ro-badge mono">RO</span>
+          </a-tooltip>
           <span class="prompt mono">db{{ db }}&gt;</span>
           <input
             ref="inputRef"
@@ -429,6 +434,11 @@ onMounted(() => inputRef.value?.focus())
 .cli-cmd { font-size: 13px; font-weight: 600; letter-spacing: 0.1px; }
 .cmd-time { font-size: 10px; color: var(--text-3); font-weight: 400; margin-left: 10px; }
 .prompt { color: var(--accent); font-weight: 700; }
+.ro-badge {
+  font-size: 9.5px; font-weight: 700; line-height: 1.5;
+  color: #f5a623; border: 1px solid #f5a623; border-radius: 3px;
+  padding: 0 3px; margin-right: -6px; flex-shrink: 0;
+}
 .cli-result {
   margin: 5px 0 0;
   padding: 9px 13px;

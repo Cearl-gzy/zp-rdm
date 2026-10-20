@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.15.2-red)
+![version](https://img.shields.io/badge/version-1.16.0-red)
 
 ---
 
@@ -69,6 +69,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
+| 生产安全 | 只读连接模式（客户端层拦截写命令）、环境标签着色（生产/测试/开发）、写命令审计日志 |
 | 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
 | 哨兵 | Redis Sentinel 连接、故障转移自动跟随、多哨兵地址 |
 | 工程化 | 全平台密码加密、TLS/mTLS 连接、工作区会话恢复、SSH 隧道、命令面板、自动更新 |
@@ -155,6 +156,12 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **整库导出** — JSONL 流式导出（每行一键），带实时进度，大库导出期间界面可操作
 - **跨实例导入** — RESTORE REPLACE 导入到任意连接/DB，同名键覆盖前确认
 - **跨连接复制** — 值面板一键把当前键复制到另一个连接的指定 DB，支持重命名与 TTL 保留
+
+### 🛡️ 生产安全
+
+- **只读连接模式** — 连接配置勾选「只读模式」后，客户端层拦截**全部写命令**（SET/DEL/EVAL/CONFIG SET/FLUSHDB…含模块写命令与容器命令写子命令）：UI 编辑器写按钮自动禁用，CLI 执行写命令直接报错"只读模式"，管道含写命令整管中止，数据迁移/导入同样被拦截。覆盖所有写入路径（go-redis Hook 实现），是防手滑护栏（未知命令默认放行），非服务端安全边界——服务端请配合 ACL `+@read`
+- **环境标签着色** — 连接可标记 生产（红）/ 测试（橙）/ 开发（绿）：侧栏连接项、标签页、视图头部全部显示彩色环境徽标，多个实例同开时一眼识别"这是生产库"
+- **写命令审计** — 连接开启审计后，所有写命令（含参数，截断 300 字符）追加记录到本地 JSONL 日志（`配置目录/zp-rdm/audit/audit-日期.jsonl`），按天滚动；审计写入失败静默忽略，绝不阻塞正常命令
 
 ### 🔐 安全与工程化
 

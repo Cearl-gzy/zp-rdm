@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, SaveOutlined } from '@ant-design/icons-vue'
 import { GetConfig, SetConfig, ConfigRewrite } from '../../wailsjs/go/service/ServerService'
+import { useReadonly } from '../utils/readonly'
 
 const props = defineProps<{ connId: string; db: number }>()
 const { t, te } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 interface CfgRow { param: string; value: string }
 
@@ -132,7 +134,7 @@ const columns = computed(() => [
         <template #icon><ReloadOutlined /></template>
         {{ t('common.refresh') }}
       </a-button>
-      <a-button size="small" @click="onRewrite">
+      <a-button size="small" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="onRewrite">
         <template #icon><SaveOutlined /></template>
         {{ t('serverPanel.cfgRewrite') }}
       </a-button>
@@ -159,7 +161,7 @@ const columns = computed(() => [
             <span class="text-3" style="font-size: 11.5px">{{ desc(record.param) }}</span>
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-button size="small" type="link" style="padding: 0" @click="openEdit(record)">
+            <a-button size="small" type="link" style="padding: 0" :disabled="ro" @click="openEdit(record)">
               {{ t('serverPanel.cfgEdit') }}
             </a-button>
           </template>

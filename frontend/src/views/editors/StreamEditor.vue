@@ -4,11 +4,13 @@ import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined, MinusCircleOutlined, TeamOutlined, CheckOutlined } from '@ant-design/icons-vue'
 import { StreamGet, StreamAdd, StreamDel, StreamGroups, StreamConsumers, StreamPending, StreamAck, StreamGroupCreate, StreamGroupDestroy, StreamConsumerDelete } from '../../../wailsjs/go/service/ValueService'
+import { useReadonly } from '../../utils/readonly'
 import type { StreamItem, ScanItems, StreamGroup, StreamConsumer, StreamPendingEntry } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const items = ref<StreamItem[]>([])
 const total = ref(props.total)
@@ -291,7 +293,7 @@ function idleText(ms: number): string {
         <a-select-option :value="500">{{ t('stream.lastN', { n: 500 }) }}</a-select-option>
         <a-select-option :value="1000">{{ t('stream.lastN', { n: 1000 }) }}</a-select-option>
       </a-select>
-      <a-button size="small" type="primary" @click="openAdd">
+      <a-button size="small" type="primary" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="openAdd">
         <template #icon><PlusOutlined /></template>
         {{ t('stream.addEntry') }}
       </a-button>
@@ -320,7 +322,7 @@ function idleText(ms: number): string {
             <span class="mono cell-value" :title="fieldsText(record)">{{ fieldsText(record) }}</span>
           </template>
           <template v-else-if="column.key === 'ops'">
-            <a-button size="small" type="text" danger @click="remove(record)"><template #icon><DeleteOutlined /></template></a-button>
+            <a-button size="small" type="text" danger :disabled="ro" @click="remove(record)"><template #icon><DeleteOutlined /></template></a-button>
           </template>
         </template>
       </a-table>
@@ -353,7 +355,7 @@ function idleText(ms: number): string {
         <a-button size="small" :loading="groupsLoading" @click="loadGroups">
           <template #icon><ReloadOutlined /></template>
         </a-button>
-        <a-button size="small" type="primary" @click="openCreateGroup">
+        <a-button size="small" type="primary" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="openCreateGroup">
           <template #icon><PlusOutlined /></template>
           {{ t('stream.createGroup') }}
         </a-button>
@@ -380,7 +382,7 @@ function idleText(ms: number): string {
           </template>
           <template v-else-if="column.key === 'ops'">
             <a-button size="small" type="link" @click="openPending(record)">{{ t('stream.pending') }}</a-button>
-            <a-button size="small" type="link" danger @click="destroyGroup(record)">{{ t('common.delete') }}</a-button>
+            <a-button size="small" type="link" danger :disabled="ro" @click="destroyGroup(record)">{{ t('common.delete') }}</a-button>
           </template>
         </template>
         <template #expandedRowRender="{ record }">
@@ -396,7 +398,7 @@ function idleText(ms: number): string {
             <template #bodyCell="{ column, record: c }">
               <template v-if="column.key === 'idleMs'">{{ idleText(c.idleMs) }}</template>
               <template v-else-if="column.key === 'ops'">
-                <a-button size="small" type="text" danger @click="removeConsumer(record.name, c.name)">
+                <a-button size="small" type="text" danger :disabled="ro" @click="removeConsumer(record.name, c.name)">
                   <template #icon><DeleteOutlined /></template>
                 </a-button>
               </template>
@@ -433,7 +435,7 @@ function idleText(ms: number): string {
             </template>
             <template v-else-if="column.key === 'ops'">
               <a-tooltip :title="t('stream.ackTooltip')">
-                <a-button size="small" type="text" @click="ack([record.id])">
+                <a-button size="small" type="text" :disabled="ro" @click="ack([record.id])">
                   <template #icon><CheckOutlined /></template>
                 </a-button>
               </a-tooltip>

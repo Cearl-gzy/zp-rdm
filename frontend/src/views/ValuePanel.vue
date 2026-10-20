@@ -9,6 +9,7 @@ import { GetValue } from '../../wailsjs/go/service/ValueService'
 import { DeleteKeys, RenameKey, SetTTL, CopyKey } from '../../wailsjs/go/service/KeyService'
 import { CopyKeyAcross } from '../../wailsjs/go/service/TransferService'
 import { useConnectionStore } from '../stores/connection'
+import { useReadonly } from '../utils/readonly'
 import type { ValueDetail } from '../types'
 import { formatBytes, formatTTL } from '../utils/format'
 import StringEditor from './editors/StringEditor.vue'
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const detail = ref<ValueDetail | null>(null)
 const loading = ref(false)
@@ -77,6 +79,7 @@ async function doRename() {
 const ttlVisible = ref(false)
 const ttlValue = ref(-1)
 function openTTL() {
+  if (ro.value) return // 只读模式下 TTL 不可改
   ttlValue.value = detail.value?.ttl ?? -1
   ttlVisible.value = true
 }
@@ -172,8 +175,8 @@ function copyName() {
       <div class="vp-meta-row" v-if="detail">
         <span class="type-badge" :class="`type-${detail.type}`">{{ detail.type }}</span>
         <span class="meta-chip static num" :title="t('value.encodingTip', { enc: detail.encoding || '-' })">{{ detail.encoding || '-' }}</span>
-        <a-tooltip :title="t('value.ttlTip')">
-          <span class="meta-chip clickable" :class="{ warn: detail.ttl > 0 && detail.ttl < 300 }" @click="openTTL">
+        <a-tooltip :title="ro ? t('common.readonlyTip') : t('value.ttlTip')">
+          <span class="meta-chip" :class="[ro ? 'static' : 'clickable', { warn: detail.ttl > 0 && detail.ttl < 300 }]" @click="openTTL">
             <ClockCircleOutlined />
             <span class="num">{{ formatTTL(detail.ttl) }}</span>
           </span>
@@ -182,10 +185,10 @@ function copyName() {
         <span v-if="detail.type !== 'string'" class="meta-chip static num">{{ t('value.items', { n: detail.length }) }}</span>
         <div class="vp-actions">
           <a-tooltip :title="t('common.refresh')"><button class="vp-icon-btn" @click="load"><ReloadOutlined :spin="loading" /></button></a-tooltip>
-          <a-tooltip :title="t('value.rename')"><button class="vp-icon-btn" @click="openRename"><EditOutlined /></button></a-tooltip>
-          <a-tooltip :title="t('value.copyKey')"><button class="vp-icon-btn" @click="openCopy"><CopyOutlined /></button></a-tooltip>
+          <a-tooltip :title="ro ? t('common.readonlyTip') : t('value.rename')"><button class="vp-icon-btn" :disabled="ro" @click="openRename"><EditOutlined /></button></a-tooltip>
+          <a-tooltip :title="ro ? t('common.readonlyTip') : t('value.copyKey')"><button class="vp-icon-btn" :disabled="ro" @click="openCopy"><CopyOutlined /></button></a-tooltip>
           <span class="vp-actions-divider" />
-          <a-tooltip :title="t('common.delete')"><button class="vp-icon-btn danger" @click="doDelete"><DeleteOutlined /></button></a-tooltip>
+          <a-tooltip :title="ro ? t('common.readonlyTip') : t('common.delete')"><button class="vp-icon-btn danger" :disabled="ro" @click="doDelete"><DeleteOutlined /></button></a-tooltip>
         </div>
       </div>
     </div>
@@ -294,6 +297,8 @@ function copyName() {
   padding: 0;
 }
 .vp-icon-btn:hover { background: var(--bg-hover); color: var(--text-1); }
+.vp-icon-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.vp-icon-btn:disabled:hover { background: transparent; color: var(--text-3); }
 .vp-icon-btn.danger:hover { background: var(--accent-soft); color: var(--accent); }
 .vp-body { flex: 1; min-height: 0; padding: 12px 18px 14px; overflow: hidden; }
 .vp-body :deep(.ant-spin-container), .vp-body :deep(.ant-spin-nested-loading) { height: 100%; }

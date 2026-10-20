@@ -30,6 +30,9 @@ export interface ConnectionProfile {
   sentinel?: boolean // Redis Sentinel 模式（host:port 为首个哨兵地址）
   masterName?: string // 哨兵监控的 master 名称
   sentinelAddrs?: string // 额外哨兵地址（每行或逗号分隔 host:port）
+  readonly?: boolean // 只读模式：客户端层拦截全部写命令
+  env?: string // 环境标签：'' | prod | test | dev（界面着色）
+  audit?: boolean // 写命令审计（记录到配置目录 audit/*.jsonl）
 }
 
 export interface ConnState {
@@ -41,6 +44,8 @@ export interface ConnState {
   version: string
   mode: string
   modules: string[] // 已加载模块名（如 ReJSON-RL、search）
+  readonly?: boolean // 只读模式（界面禁用写操作）
+  env?: string // 环境标签（prod/test/dev，界面着色）
 }
 
 export interface KeyInfo {

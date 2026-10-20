@@ -4,10 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { theme } from 'ant-design-vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import enUS from 'ant-design-vue/es/locale/en_US'
-import { CloseOutlined } from '@ant-design/icons-vue'
+import { CloseOutlined, LockOutlined } from '@ant-design/icons-vue'
 import { useAppStore } from './stores/app'
 import { useConnectionStore } from './stores/connection'
 import { emitAppEvent, AppEvents } from './utils/events'
+import { envColor } from './utils/env'
 import TitleBar from './components/TitleBar.vue'
 import Sidebar from './components/Sidebar.vue'
 import Welcome from './components/Welcome.vue'
@@ -103,7 +104,13 @@ const themeConfig = computed(() => ({
             >
               <span class="tab-color" :style="{ background: tab.state.color || '#e04536' }" />
               <span class="status-dot" :class="{ on: true }" />
+              <span
+                v-if="tab.state.env"
+                class="tab-env"
+                :style="{ color: envColor(tab.state.env), borderColor: envColor(tab.state.env) }"
+              >{{ tab.state.env.toUpperCase() }}</span>
               <span class="tab-name">{{ tab.state.name }}</span>
+              <LockOutlined v-if="tab.state.readonly" class="tab-lock" :title="t('common.readonly')" />
               <span class="tab-db num">db{{ conn.currentDb[tab.id] ?? 0 }}</span>
               <button class="tab-close" @click.stop="conn.close(tab.id)">
                 <CloseOutlined />
@@ -180,6 +187,11 @@ const themeConfig = computed(() => ({
 }
 .tab-color { width: 3px; height: 12px; border-radius: 2px; flex-shrink: 0; }
 .tab-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.tab-env {
+  font-size: 9px; line-height: 1.5; padding: 0 3px;
+  border: 1px solid; border-radius: 3px; flex-shrink: 0;
+}
+.tab-lock { font-size: 11px; color: var(--text-3); flex-shrink: 0; }
 .tab-db {
   font-size: 10px;
   color: var(--text-3);

@@ -4,11 +4,13 @@ import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons-vue'
 import { ZSetGet, ZSetAdd, ZSetRemove, ZSetUpdate } from '../../../wailsjs/go/service/ValueService'
+import { useReadonly } from '../../utils/readonly'
 import type { ZSetItem, ScanItems } from '../../types'
 
 const props = defineProps<{ connId: string; db: number; keyName: string; total: number }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const items = ref<ZSetItem[]>([])
 const total = ref(props.total)
@@ -115,7 +117,7 @@ const columns = computed(() => [
         </template>
         {{ rev ? t('editors.desc') : t('editors.asc') }}
       </a-button>
-      <a-button size="small" type="primary" @click="openAdd">
+      <a-button size="small" type="primary" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="openAdd">
         <template #icon><PlusOutlined /></template>
         {{ t('editors.addMember') }}
       </a-button>
@@ -140,8 +142,8 @@ const columns = computed(() => [
             <span class="mono score">{{ record.score }}</span>
           </template>
           <template v-else-if="column.key === 'ops'">
-            <a-button size="small" type="text" @click="openEdit(record)"><template #icon><EditOutlined /></template></a-button>
-            <a-button size="small" type="text" danger @click="remove(record)"><template #icon><DeleteOutlined /></template></a-button>
+            <a-button size="small" type="text" :disabled="ro" @click="openEdit(record)"><template #icon><EditOutlined /></template></a-button>
+            <a-button size="small" type="text" danger :disabled="ro" @click="remove(record)"><template #icon><DeleteOutlined /></template></a-button>
           </template>
         </template>
       </a-table>

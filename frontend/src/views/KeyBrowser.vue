@@ -15,6 +15,7 @@ import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useConnectionStore } from '../stores/connection'
 import { useAppStore } from '../stores/app'
 import { onAppEvent, AppEvents } from '../utils/events'
+import { useReadonly } from '../utils/readonly'
 import type { KeyInfo, ScanResult } from '../types'
 import { buildKeyTree, type KeyNode } from '../utils/keyTree'
 import { formatBytes, formatTTL } from '../utils/format'
@@ -24,6 +25,7 @@ const props = defineProps<{ connId: string; db: number }>()
 const conn = useConnectionStore()
 const app = useAppStore()
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 // 从工作区会话恢复浏览状态
 const savedWs = app.workspace.conns[props.connId] ?? {}
@@ -445,8 +447,8 @@ const listColumns = computed(() => [
             <template #icon><ReloadOutlined /></template>
           </a-button>
         </a-tooltip>
-        <a-tooltip :title="t('keyBrowser.newKeyTooltip')">
-          <a-button size="small" type="primary" @click="openCreate">
+        <a-tooltip :title="ro ? t('common.readonlyTip') : t('keyBrowser.newKeyTooltip')">
+          <a-button size="small" type="primary" :disabled="ro" @click="openCreate">
             <template #icon><PlusOutlined /></template>
           </a-button>
         </a-tooltip>
@@ -489,14 +491,14 @@ const listColumns = computed(() => [
                 <DownloadOutlined /> {{ t('keyBrowser.exportDbMenu') }}
               </a-menu-item>
               <a-menu-divider />
-              <a-menu-item key="import" @click="doImport">
+              <a-menu-item key="import" :disabled="ro" @click="doImport">
                 <UploadOutlined /> {{ t('keyBrowser.importMenu') }}
               </a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
         <transition name="fade">
-          <div v-if="checkedKeys.length" class="batch-bar">
+          <div v-if="checkedKeys.length && !ro" class="batch-bar">
             <a-dropdown trigger="click">
               <a-button size="small">
                 {{ t('keyBrowser.batchActions', { n: checkedKeys.length }) }} <DownOutlined />

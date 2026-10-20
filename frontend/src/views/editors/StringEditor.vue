@@ -5,6 +5,7 @@ import { message } from 'ant-design-vue'
 import { SaveOutlined, FormatPainterOutlined, CloudDownloadOutlined, WarningOutlined } from '@ant-design/icons-vue'
 import { SetString, SetStringHex, GetFullString, GetStringHex } from '../../../wailsjs/go/service/ValueService'
 import { tryFormatJson } from '../../utils/format'
+import { useReadonly } from '../../utils/readonly'
 import CodeEditor from '../../components/CodeEditor.vue'
 
 const props = defineProps<{
@@ -19,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [] }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const text = ref(props.value)
 // 二进制值默认 Hex 视图
@@ -163,7 +165,7 @@ async function save() {
         </a-button>
       </template>
 
-      <a-button type="primary" size="small" style="margin-left: auto" :loading="saving" @click="save">
+      <a-button type="primary" size="small" style="margin-left: auto" :loading="saving" :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="save">
         <template #icon><SaveOutlined /></template>
         {{ t('common.save') }}
       </a-button>

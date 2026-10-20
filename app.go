@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -21,7 +22,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.15.2"
+const AppVersion = "1.16.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -56,6 +57,9 @@ func NewApp() *App {
 		panic(err)
 	}
 	m := redisx.NewManager()
+	if dir, err := os.UserConfigDir(); err == nil {
+		redisx.AuditDir = filepath.Join(dir, "zp-rdm", "audit") // 写命令审计日志目录
+	}
 	return &App{
 		Store:      st,
 		Manager:    m,

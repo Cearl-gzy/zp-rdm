@@ -33,5 +33,7 @@ export default {
     optional: 'Optional',
     all: 'All',
     none: 'None',
+    readonly: 'Read-only',
+    readonlyTip: 'Read-only mode: write commands are blocked',
   },
 }

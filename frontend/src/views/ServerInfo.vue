@@ -5,6 +5,7 @@ import { message, Modal } from 'ant-design-vue'
 import { ReloadOutlined, DisconnectOutlined } from '@ant-design/icons-vue'
 import { GetInfo, ClientList, KillClient, SearchIndexes } from '../../wailsjs/go/service/ServerService'
 import { useConnectionStore } from '../stores/connection'
+import { useReadonly } from '../utils/readonly'
 import type { InfoMap, ClientConnInfo } from '../types'
 import { formatBytes, formatDuration, formatNumber } from '../utils/format'
 import TrendChart from '../components/TrendChart.vue'
@@ -12,6 +13,7 @@ import TrendChart from '../components/TrendChart.vue'
 const props = defineProps<{ connId: string; db: number }>()
 const conn = useConnectionStore()
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 // 已加载模块（连接打开时由后端 MODULE LIST 探测）
 const modules = computed(() => conn.openTabs.find(t => t.id === props.connId)?.state?.modules ?? [])
@@ -297,8 +299,8 @@ function killClient(addr: string) {
             <template v-if="column.key === 'addr'"><span class="mono">{{ record.addr }}</span></template>
             <template v-else-if="column.key === 'name'"><span class="mono text-2">{{ record.name || '-' }}</span></template>
             <template v-else-if="column.key === 'ops'">
-              <a-tooltip :title="t('server.killTooltip')">
-                <a-button size="small" type="text" danger @click="killClient(record.addr)">
+              <a-tooltip :title="ro ? t('common.readonlyTip') : t('server.killTooltip')">
+                <a-button size="small" type="text" danger :disabled="ro" @click="killClient(record.addr)">
                   <template #icon><DisconnectOutlined /></template>
                 </a-button>
               </a-tooltip>

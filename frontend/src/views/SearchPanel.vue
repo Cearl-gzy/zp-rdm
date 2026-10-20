@@ -8,6 +8,7 @@ import {
   SearchCreateIndex, SearchDropIndex, SearchAggregate,
 } from '../../wailsjs/go/service/ServerService'
 import { emitAppEvent, AppEvents } from '../utils/events'
+import { useReadonly } from '../utils/readonly'
 
 interface SearchField { name: string; type: string; path: string }
 interface SearchDoc { key: string; fields: Record<string, string> }
@@ -18,6 +19,7 @@ interface AggResult { total: number; rows: AggRow[] }
 const props = defineProps<{ connId: string; db: number }>()
 
 const { t } = useI18n()
+const ro = useReadonly(() => props.connId)
 
 const mode = ref<'search' | 'agg'>('search')
 const indexes = ref<string[]>([])
@@ -256,13 +258,13 @@ onMounted(loadIndexes)
         :options="indexes.map(i => ({ value: i, label: i }))"
         :not-found-content="null"
       />
-      <a-tooltip :title="t('search.newIndex')">
-        <a-button size="small" @click="openCreate">
+      <a-tooltip :title="ro ? t('common.readonlyTip') : t('search.newIndex')">
+        <a-button size="small" :disabled="ro" @click="openCreate">
           <template #icon><PlusOutlined /></template>
         </a-button>
       </a-tooltip>
-      <a-tooltip :title="t('search.dropCurrentIndex')">
-        <a-button size="small" danger :disabled="!index" @click="dropIndex">
+      <a-tooltip :title="ro ? t('common.readonlyTip') : t('search.dropCurrentIndex')">
+        <a-button size="small" danger :disabled="!index || ro" @click="dropIndex">
           <template #icon><DeleteOutlined /></template>
         </a-button>
       </a-tooltip>
@@ -343,7 +345,7 @@ onMounted(loadIndexes)
       <a-empty v-if="!indexes.length" style="margin-top: 60px">
         <template #description>
           {{ t('search.noIndexes') }}
-          <a-button type="link" size="small" style="padding: 0" @click="openCreate">{{ t('search.createOne') }}</a-button>
+          <a-button v-if="!ro" type="link" size="small" style="padding: 0" @click="openCreate">{{ t('search.createOne') }}</a-button>
         </template>
       </a-empty>
 
