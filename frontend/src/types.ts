@@ -288,3 +288,33 @@ export interface UpdateInfo {
   sha256: string
   auto: boolean
 }
+
+export interface TsSample {
+  ts: number
+  value: number
+}
+
+export interface TsRule {
+  destKey: string
+  bucketMs: number
+  aggregator: string
+}
+
+export interface TsInfo {
+  totalSamples: number
+  memoryUsage: number
+  firstTimestamp: number
+  lastTimestamp: number
+  retentionMs: number
+  chunkCount: number
+  labels: Record<string, string>
+  rules: TsRule[]
+}
+
+export interface BfInfo {
+  capacity: number
+  size: number
+  filters: number
+  inserted: number
+  expansion: number
+}

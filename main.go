@@ -39,6 +39,8 @@ func main() {
 			app.Server,
 			app.Cli,
 			app.Transfer,
+			app.Ts,
+			app.Bf,
 		},
 		Windows: &windows.Options{
 			WebviewIsTransparent: false,

@@ -1,0 +1,21 @@
+export default {
+  bloom: {
+    inserted: 'Inserted',
+    capacity: 'Capacity',
+    sizeBytes: 'Bitmap Size',
+    filters: 'Sub-filters',
+    fillTip: 'Higher fill ratio means higher false-positive rate; the module auto-expands near 100% (if enabled)',
+    semanticsTip: 'Bloom semantics: "may exist" carries a small false-positive chance; "definitely not" is always accurate',
+    add: 'Add Item',
+    added: 'Added',
+    addedDup: 'Item may already exist (not new)',
+    itemRequired: 'Please enter an item',
+    itemPlaceholder: 'Item value',
+    checkTitle: 'Batch Existence Check',
+    checkPlaceholder: 'One item per line (max 100)',
+    checkRequired: 'Please enter items to check',
+    check: 'Check',
+    maybeExists: 'May exist',
+    definitelyNot: 'Definitely not',
+  },
+}

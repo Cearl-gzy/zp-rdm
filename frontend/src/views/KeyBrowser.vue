@@ -86,10 +86,10 @@ const PAGE_SIZE = 500
 
 const treeData = computed<KeyNode[]>(() => buildKeyTree(keys.value, delimiter.value))
 
-const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream', 'ReJSON-RL', 'vectorset']
+const keyTypes = ['string', 'hash', 'list', 'set', 'zset', 'stream', 'ReJSON-RL', 'vectorset', 'TSDB-TYPE', 'MBbloom--']
 
 // 新建键可选类型：ReJSON-RL 模块加载时才提供 json（CreateKey 用 'json' 分支）；
-// vectorset 仅 Redis 8+ 支持（按服务端版本探测）
+// vectorset 仅 Redis 8+ 支持（按服务端版本探测）；ts/bf 按模块探测
 const hasJsonModule = computed(() =>
   (conn.openTabs.find(tab => tab.id === props.connId)?.state?.modules ?? []).some(m => /rejson/i.test(m)),
 )
@@ -98,10 +98,18 @@ const hasVector = computed(() => {
   const major = parseInt(v.split('.')[0], 10)
   return Number.isFinite(major) && major >= 8
 })
+const hasTsModule = computed(() =>
+  (conn.openTabs.find(tab => tab.id === props.connId)?.state?.modules ?? []).some(m => /timeseries/i.test(m)),
+)
+const hasBfModule = computed(() =>
+  (conn.openTabs.find(tab => tab.id === props.connId)?.state?.modules ?? []).some(m => /^(bf|mbbloom)$/i.test(m) || /bloom/i.test(m)),
+)
 const createTypes = computed(() => {
   const base = ['string', 'hash', 'list', 'set', 'zset', 'stream']
   if (hasVector.value) base.push('vectorset')
   if (hasJsonModule.value) base.push('json')
+  if (hasTsModule.value) base.push('ts')
+  if (hasBfModule.value) base.push('bf')
   return base
 })
 const jsonExample = '{"a": 1}'
@@ -657,8 +665,8 @@ const listColumns = computed(() => [
         <a-form-item v-if="createForm.type === 'vectorset'" :label="t('vector.elementName')">
           <a-input v-model:value="createForm.field" placeholder="item-1" class="mono" />
         </a-form-item>
-        <a-form-item :label="createForm.type === 'zset' ? t('keyBrowser.member') : createForm.type === 'string' ? t('common.value') : createForm.type === 'json' ? t('keyBrowser.jsonDoc') : createForm.type === 'vectorset' ? t('vector.vectorJson') : t('keyBrowser.initialValue')">
-          <a-textarea v-model:value="createForm.value" :rows="3" class="mono" :placeholder="createForm.type === 'json' ? jsonExample : createForm.type === 'vectorset' ? '[0.1, 0.2, 0.3]' : ''" />
+        <a-form-item :label="createForm.type === 'zset' ? t('keyBrowser.member') : createForm.type === 'string' ? t('common.value') : createForm.type === 'json' ? t('keyBrowser.jsonDoc') : createForm.type === 'vectorset' ? t('vector.vectorJson') : createForm.type === 'ts' ? t('ts.sampleValue') : createForm.type === 'bf' ? t('bloom.itemPlaceholder') : t('keyBrowser.initialValue')">
+          <a-textarea v-model:value="createForm.value" :rows="3" class="mono" :placeholder="createForm.type === 'json' ? jsonExample : createForm.type === 'vectorset' ? '[0.1, 0.2, 0.3]' : createForm.type === 'ts' ? '42.5' : ''" />
         </a-form-item>
         <a-form-item v-if="createForm.type === 'zset'" :label="t('keyBrowser.scoreLabel')">
           <a-input-number v-model:value="createForm.score" style="width: 100%" />

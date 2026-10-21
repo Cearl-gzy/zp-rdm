@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -102,6 +103,21 @@ func (s *ValueService) GetValue(connID string, db int, key string) (*model.Value
 	case "vectorset":
 		// Redis 8 向量集合：元素数走 VCARD
 		d.Length, _ = c.Do(ctx, "VCARD", key).Int64()
+	case "TSDB-TYPE":
+		// Redis TimeSeries：样本数走 TS.INFO totalSamples
+		if raw, err := c.Do(ctx, "TS.INFO", key).Result(); err == nil {
+			d.Length = toInt64(toStringAnyMap(raw)["totalSamples"])
+		}
+	case "MBbloom--":
+		// RedisBloom：已插入元素数走 BF.INFO
+		if raw, err := c.Do(ctx, "BF.INFO", key).Result(); err == nil {
+			m := toStringAnyMap(raw)
+			for k, v := range m {
+				if strings.Contains(strings.ToLower(k), "inserted") {
+					d.Length = toInt64(v)
+				}
+			}
+		}
 	}
 	return d, nil
 }
@@ -653,6 +669,23 @@ func (s *ValueService) CreateKey(connID string, db int, key, typ, value, field s
 		}
 		args = append(args, field)
 		if _, err := c.Do(ctx, args...).Bool(); err != nil {
+			return err
+		}
+	case "ts":
+		// Redis TimeSeries：value 为数值样本，TS.ADD * 自动创建序列
+		fv, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err != nil {
+			return fmt.Errorf("样本值需为数值")
+		}
+		if _, err := c.Do(ctx, "TS.ADD", key, "*", fv).Int64(); err != nil {
+			return err
+		}
+	case "bf":
+		// RedisBloom：value 为首个元素，BF.ADD 按默认参数自动创建过滤器
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("元素不能为空")
+		}
+		if _, err := c.Do(ctx, "BF.ADD", key, value).Bool(); err != nil {
 			return err
 		}
 	default:

@@ -1,0 +1,21 @@
+export default {
+  bloom: {
+    inserted: '已插入元素',
+    capacity: '容量',
+    sizeBytes: '位图占用',
+    filters: '子过滤器',
+    fillTip: '填充率越高误判率越高，接近 100% 时模块会自动扩容（若开启）',
+    semanticsTip: '布隆语义：「可能存在」有小概率误判；「一定不存在」永远准确',
+    add: '添加元素',
+    added: '已添加',
+    addedDup: '元素可能已存在（未新增）',
+    itemRequired: '请输入元素',
+    itemPlaceholder: '元素值',
+    checkTitle: '批量存在性检查',
+    checkPlaceholder: '每行一个元素（最多 100 个）',
+    checkRequired: '请输入要检查的元素',
+    check: '检查',
+    maybeExists: '可能存在',
+    definitelyNot: '一定不存在',
+  },
+}

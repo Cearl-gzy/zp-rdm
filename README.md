@@ -7,7 +7,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.22.0-red)
+![version](https://img.shields.io/badge/version-1.23.0-red)
 
 ---
 
@@ -69,7 +69,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
 | 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察 + 键空间事件流）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示）、MONITOR 实时命令流 |
 | 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+）、Lua 脚本缓存与 Redis Functions 管理、内存医生（MEMORY STATS/DOCTOR） |
-| 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、Redis 8 Vector Set 向量面板 |
+| 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、TimeSeries 时序面板、Bloom Filter 面板、Redis 8 Vector Set 向量面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 生产安全 | 只读连接模式（客户端层拦截写命令）、环境标签着色（生产/测试/开发）、写命令审计日志 |
 | 集群 | Redis Cluster 连接、全节点聚合扫描、集群节点视图、hash slot 查询 |
@@ -124,6 +124,8 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **RediSearch 查询面板** — 独立"搜索"视图：索引下拉（FT._LIST）+ schema 字段展示（名称/类型/JSONPath）+ 完整查询语法（`@field:value`、`@age:[18 30]`、`@city:{北京}`），结果分页直达数据视图
 - **FT.CREATE 索引向导** — 图形化建索引：ON JSON/HASH、多键前缀、字段表（JSONPath/别名/类型 TEXT·TAG·NUMERIC·GEO/SORTABLE），JSONPath 末段自动填别名；索引可一键删除（可选 DD 连文档删）
 - **FT.AGGREGATE 聚合面板** — 结构化构造聚合查询：过滤条件 + GROUPBY 多字段 + 聚合器（COUNT / COUNT_DISTINCT / SUM / AVG / MIN / MAX，自动别名），动态列结果表；复杂管线（LOAD/APPLY/SORTBY）可走 CLI 原生命令
+- **TimeSeries 时序面板** — `TSDB-TYPE` 键自动识别：`TS.INFO` 概览（样本数/内存/保留期/分块数 + 标签与降采样规则标签）、区间预设（全部/5分钟/1小时/1天）+ 聚合查询（avg/sum/min/max/count/first/last + bucket 毫秒）SVG 折线图、最近样本表（倒序 50 条）、`TS.ADD` 追加样本（留空=服务端当前时间）；模块加载时新建键可选 ts 类型
+- **Bloom Filter 面板** — `MBbloom--` 键自动识别：`BF.INFO` 概览卡片（已插入/容量/位图占用/子过滤器数）+ 填充率进度条（分级着色）、`BF.ADD` 添加元素（提示新增/可能已存在）、`BF.MEXISTS` 批量存在性检查（每行一个最多 100 个，「可能存在/一定不存在」语义标记）；模块加载时新建键可选 bf 类型
 
 ### 🧭 Redis 8 向量面板（Vector Set）
 
@@ -234,10 +236,12 @@ go test ./...      # 单元测试（miniredis，无需真实 Redis）
 ZP_RDM_TEST_REDIS_ADDR=localhost:6379 go test ./...
 ```
 
-RedisJSON / RediSearch 集成测试需要带模块的实例（Redis Stack 或加载了 redisearch + rejson 的 Redis 8）：
+RedisJSON / RediSearch / TimeSeries / Bloom 集成测试需要带模块的实例（Redis Stack 或加载了 redisearch + rejson + redisbloom + redistimeseries 的 Redis 8）：
 
 ```bash
 ZP_RDM_TEST_JSON_ADDR=localhost:6380 go test ./...
+# TimeSeries / Bloom 也可单独指定（缺省回退到 ZP_RDM_TEST_JSON_ADDR）：
+ZP_RDM_TEST_STACK_ADDR=localhost:6380 go test ./...
 ```
 
 > 未设置对应环境变量时相关测试自动跳过，不影响其余测试。

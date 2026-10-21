@@ -7,7 +7,7 @@ A lightweight, polished, full-featured Redis desktop manager.
 Built with **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**. Single-file exe, no runtime dependencies, connect on launch.
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.22.0-red)
+![version](https://img.shields.io/badge/version-1.23.0-red)
 
 ---
 
@@ -69,7 +69,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | Monitoring | Real-time OPS / memory / clients / hit-rate trends, INFO overview, client management |
 | Operations | Slow log, LATENCY event curves, Pub/Sub (channel insights + keyspace event stream), full-command CLI (Tab completion + inline COMMAND DOCS), live MONITOR stream |
 | Server admin | Replication topology, CONFIG get/set/REWRITE, ACL user management (Redis 6+), Lua script cache & Redis Functions management, Memory Doctor (MEMORY STATS/DOCTOR) |
-| Modules | RedisJSON editor (text/tree, path-level writes), RediSearch query panel, Redis 8 Vector Set panel |
+| Modules | RedisJSON editor (text/tree, path-level writes), RediSearch query panel, TimeSeries panel, Bloom Filter panel, Redis 8 Vector Set panel |
 | Data migration | Export selected keys, full-DB export, cross-instance import, cross-connection copy |
 | Production safety | Read-only connection mode (client-side write blocking), environment tag coloring (prod/test/dev), write-command audit log |
 | Cluster | Redis Cluster connections, aggregated all-node scanning, cluster node view, hash slot lookup |
@@ -124,6 +124,8 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **RediSearch query panel** — a dedicated "Search" view: index dropdown (FT._LIST) + schema field display (name/type/JSONPath) + full query syntax (`@field:value`, `@age:[18 30]`, `@city:{Beijing}`), with paged results that jump straight into the data view
 - **FT.CREATE index wizard** — build indexes graphically: ON JSON/HASH, multiple key prefixes, field table (JSONPath/alias/type TEXT·TAG·NUMERIC·GEO/SORTABLE), alias auto-filled from the last JSONPath segment; one-click index deletion (optional DD to drop documents too)
 - **FT.AGGREGATE panel** — structured aggregation builder: filter + multi-field GROUPBY + reducers (COUNT / COUNT_DISTINCT / SUM / AVG / MIN / MAX, auto-aliased), dynamic-column result table; complex pipelines (LOAD/APPLY/SORTBY) via native CLI commands
+- **TimeSeries panel** — `TSDB-TYPE` keys auto-detected: `TS.INFO` overview (samples/memory/retention/chunks + labels and downsampling rules), range presets (all/5m/1h/1d) + aggregation queries (avg/sum/min/max/count/first/last with bucket ms) on an SVG line chart, latest-samples table (last 50, newest first), `TS.ADD` sample append (empty timestamp = server now); when the module is loaded, new keys can be created as type ts
+- **Bloom Filter panel** — `MBbloom--` keys auto-detected: `BF.INFO` overview cards (inserted/capacity/bitmap size/sub-filters) + fill-ratio bar (threshold-colored), `BF.ADD` item insert (reports added vs. probably-duplicate), `BF.MEXISTS` batch existence check (one item per line, up to 100, "may exist / definitely not" semantics chips); when the module is loaded, new keys can be created as type bf
 
 ### 🧭 Redis 8 Vector Set Panel
 
@@ -234,10 +236,12 @@ Integration tests (for commands miniredis doesn't support, e.g. DUMP/RESTORE) ne
 ZP_RDM_TEST_REDIS_ADDR=localhost:6379 go test ./...
 ```
 
-RedisJSON / RediSearch integration tests need a module-enabled instance (Redis Stack, or Redis 8 with redisearch + rejson loaded):
+RedisJSON / RediSearch / TimeSeries / Bloom integration tests need a module-enabled instance (Redis Stack, or Redis 8 with redisearch + rejson + redisbloom + redistimeseries loaded):
 
 ```bash
 ZP_RDM_TEST_JSON_ADDR=localhost:6380 go test ./...
+# TimeSeries / Bloom can also use a dedicated address (falls back to ZP_RDM_TEST_JSON_ADDR):
+ZP_RDM_TEST_STACK_ADDR=localhost:6380 go test ./...
 ```
 
 > Tests skip automatically when the corresponding env var is unset — the rest of the suite is unaffected.

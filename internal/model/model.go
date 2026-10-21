@@ -284,6 +284,42 @@ type FunctionRunStat struct {
 	DurationMs int64  `json:"durationMs"`
 }
 
+// ---------- Redis TimeSeries / Bloom Filter ----------
+
+// TsSample 时间序列单个样本（TS.RANGE 一行）
+type TsSample struct {
+	Ts    int64   `json:"ts"`
+	Value float64 `json:"value"`
+}
+
+// TsRule 降采样规则（TS.INFO rules 一项）
+type TsRule struct {
+	DestKey    string `json:"destKey"`
+	BucketMs   int64  `json:"bucketMs"`
+	Aggregator string `json:"aggregator"`
+}
+
+// TsInfo TS.INFO 概览
+type TsInfo struct {
+	TotalSamples   int64             `json:"totalSamples"`
+	MemoryUsage    int64             `json:"memoryUsage"`
+	FirstTimestamp int64             `json:"firstTimestamp"`
+	LastTimestamp  int64             `json:"lastTimestamp"`
+	RetentionMs    int64             `json:"retentionMs"`
+	ChunkCount     int64             `json:"chunkCount"`
+	Labels         map[string]string `json:"labels"`
+	Rules          []TsRule          `json:"rules"`
+}
+
+// BfInfo BF.INFO 概览（字段按模块版本尽力解析，缺失为 0）
+type BfInfo struct {
+	Capacity      int64   `json:"capacity"`
+	Size          int64   `json:"size"`      // 位图占用字节
+	Filters       int64   `json:"filters"`   // 子过滤器个数（扩容次数+1）
+	Inserted      int64   `json:"inserted"`  // 已插入元素数
+	ExpansionRate float64 `json:"expansion"` // 扩容倍率（0/缺省=不自动扩容）
+}
+
 // ScanItems 带游标的集合元素
 type ScanItems struct {
 	Cursor uint64      `json:"cursor"`

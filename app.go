@@ -22,7 +22,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.22.0"
+const AppVersion = "1.23.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -44,6 +44,8 @@ type App struct {
 	Server     *service.ServerService
 	Cli        *service.CliService
 	Transfer   *service.TransferService
+	Ts         *service.TsService
+	Bf         *service.BfService
 }
 
 // NewApp creates a new App application struct
@@ -70,6 +72,8 @@ func NewApp() *App {
 		Server:     service.NewServerService(m),
 		Cli:        service.NewCliService(m),
 		Transfer:   service.NewTransferService(m),
+		Ts:         service.NewTsService(m),
+		Bf:         service.NewBfService(m),
 	}
 }
 
@@ -91,6 +95,8 @@ func (a *App) startup(ctx context.Context) {
 	a.Server.Startup(ctx)
 	a.Cli.Startup(ctx)
 	a.Transfer.Startup(ctx)
+	a.Ts.Startup(ctx)
+	a.Bf.Startup(ctx)
 }
 
 // onShutdown 退出前保存窗口几何状态
