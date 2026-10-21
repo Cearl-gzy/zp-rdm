@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"zp-rdm/internal/model"
 )
 
 // VLINKS 邻居图与批量导入测试（miniredis 不支持 V* 命令 → requireVector 探测跳过，真实 Redis 8 双验证）
@@ -30,34 +32,39 @@ func TestVectorLinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 找到 L0 层（不假定返回顺序）
+	// 注意：HNSW 层号随机晋升，被晋升成员的邻居可能全部落在高层，L0 可为空。
+	// 因此不假定特定层有邻居，跨层收集后断言整体结构。
 	if len(layers) == 0 {
 		t.Fatalf("VLINKS 层为空: %+v", layers)
 	}
-	nb := layers[0].Neighbors
-	for i := range layers {
-		if layers[i].Layer == 0 {
-			nb = layers[i].Neighbors
-			break
+	var all []model.VectorSimEntry
+	for _, l := range layers {
+		nb := l.Neighbors
+		// 层内按相似度降序
+		for i := 1; i < len(nb); i++ {
+			if nb[i].Score > nb[i-1].Score {
+				t.Fatalf("层 %d 邻居未按相似度降序: %+v", l.Layer, nb)
+			}
+		}
+		for _, n := range nb {
+			if n.Score <= 0 || n.Score > 1 {
+				t.Fatalf("分数越界: %+v", n)
+			}
+		}
+		all = append(all, nb...)
+	}
+	if len(all) == 0 {
+		t.Fatalf("VLINKS 无邻居: %+v", layers)
+	}
+	// b 与 a 最接近，跨层最高分的邻居应是 b
+	top := all[0]
+	for _, n := range all[1:] {
+		if n.Score > top.Score {
+			top = n
 		}
 	}
-	if len(nb) == 0 {
-		t.Fatalf("VLINKS L0 无邻居: %+v", layers)
-	}
-	// 层内按相似度降序
-	for i := 1; i < len(nb); i++ {
-		if nb[i].Score > nb[i-1].Score {
-			t.Fatalf("邻居未按相似度降序: %+v", nb)
-		}
-	}
-	// b 与 a 最接近，应排第一
-	if nb[0].Element != "b" {
-		t.Fatalf("最近邻居 = %s, want b（%+v）", nb[0].Element, nb)
-	}
-	for _, n := range nb {
-		if n.Score <= 0 || n.Score > 1 {
-			t.Fatalf("分数越界: %+v", n)
-		}
+	if top.Element != "b" {
+		t.Fatalf("最近邻居 = %s(%f), want b（%+v）", top.Element, top.Score, all)
 	}
 
 	// 不存在的成员
