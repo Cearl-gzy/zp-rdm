@@ -8,6 +8,7 @@ import {
   CloudSyncOutlined, SafetyCertificateOutlined, LockOutlined, FileProtectOutlined,
 } from '@ant-design/icons-vue'
 import { PickOpenFile, PickSaveFile, CheckUpdate, DownloadUpdate, ApplyUpdate } from '../../wailsjs/go/main/App'
+import { PingRTT } from '../../wailsjs/go/service/ConnectionService'
 import { BrowserOpenURL, Environment } from '../../wailsjs/runtime/runtime'
 import { useI18n } from 'vue-i18n'
 import { setLocale, localeOptions } from '../i18n'
@@ -109,6 +110,23 @@ async function onImport() {
   }
 }
 
+// ---------- 已打开连接的 PING RTT（5s 轮询） ----------
+const rtts = ref<Record<string, number>>({})
+let rttTimer: ReturnType<typeof setInterval> | null = null
+async function pollRtt() {
+  const ids = [...conn.openIds]
+  await Promise.all(ids.map(async id => {
+    try {
+      rtts.value[id] = await PingRTT(id)
+    } catch {
+      delete rtts.value[id] // 失败时隐藏徽标
+    }
+  }))
+}
+function rttClass(ms: number): string {
+  return ms < 50 ? 'rtt-good' : ms < 200 ? 'rtt-mid' : 'rtt-bad'
+}
+
 // 命令面板 / 快捷键触发的动作
 const offHandlers: (() => void)[] = []
 onMounted(() => {
@@ -117,8 +135,13 @@ onMounted(() => {
     onAppEvent(AppEvents.ImportConnections, onImport),
     onAppEvent(AppEvents.ExportConnections, onExport),
   )
+  pollRtt()
+  rttTimer = setInterval(pollRtt, 5000)
 })
-onBeforeUnmount(() => offHandlers.forEach(off => off()))
+onBeforeUnmount(() => {
+  offHandlers.forEach(off => off())
+  if (rttTimer) clearInterval(rttTimer)
+})
 
 // ---------- 侧栏宽度拖拽 ----------
 let dragging = false
@@ -300,6 +323,12 @@ function runAutoUpdate() {
                 </div>
                 <div class="conn-addr num">{{ p.host }}:{{ p.port }}{{ p.ssh?.enabled ? ' · ssh' : '' }}</div>
               </div>
+              <span
+                v-if="conn.openIds.has(p.id) && rtts[p.id] !== undefined"
+                class="rtt num"
+                :class="rttClass(rtts[p.id])"
+                :title="t('sidebar.rttTip')"
+              >{{ rtts[p.id] }}ms</span>
               <span class="status-dot" :class="{ on: conn.openIds.has(p.id) }" />
               <a-dropdown :trigger="['click']" placement="bottomRight">
                 <button class="item-more" @click.stop><MoreOutlined /></button>
@@ -537,6 +566,11 @@ function runAutoUpdate() {
 }
 .conn-item:hover .item-more { display: inline-flex; }
 .item-more:hover { background: var(--bg-active); color: var(--text-1); }
+
+.rtt { font-size: 10px; flex-shrink: 0; letter-spacing: 0.2px; }
+.rtt-good { color: var(--success, #3f9d63); }
+.rtt-mid { color: #f5a623; }
+.rtt-bad { color: #ff6b60; }
 
 .side-footer {
   display: flex; align-items: center; justify-content: space-between;

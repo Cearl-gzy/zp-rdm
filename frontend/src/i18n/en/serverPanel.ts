@@ -3,6 +3,7 @@ export default {
     tabReplication: 'Replication',
     tabConfig: 'Config',
     tabAcl: 'ACL Users',
+    tabScript: 'Scripts',
     // ---- Replication topology ----
     repRefresh: 'Refresh',
     repSelf: 'This Node',

@@ -249,6 +249,26 @@ export interface VectorImportResult {
   truncated: boolean
 }
 
+export interface FunctionEntry {
+  name: string
+  desc: string
+  flags: string[]
+}
+
+export interface FunctionLibrary {
+  name: string
+  engine: string
+  functions: FunctionEntry[]
+  code: string
+}
+
+export interface FunctionRunStat {
+  running: boolean
+  name: string
+  command: string
+  durationMs: number
+}
+
 export type InfoMap = Record<string, Record<string, string>>
 
 export interface AclUserInfo {

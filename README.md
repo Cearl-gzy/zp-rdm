@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.19.1-red)
+![version](https://img.shields.io/badge/version-1.20.0-red)
 
 ---
 
@@ -65,8 +65,8 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载、批量 TTL/移动 DB |
 | 键分析 | TOP Keys、TTL 分布、前缀内存聚合、报告导出（JSON/CSV） |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
-| 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示）、MONITOR 实时命令流 |
-| 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
+| 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察 + 键空间事件流）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示）、MONITOR 实时命令流 |
+| 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+）、Lua 脚本缓存与 Redis Functions 管理 |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、Redis 8 Vector Set 向量面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 生产安全 | 只读连接模式（客户端层拦截写命令）、环境标签着色（生产/测试/开发）、写命令审计日志 |
@@ -154,12 +154,14 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **LATENCY 延迟事件** — `LATENCY LATEST` 事件快照表（事件/最近发生/最近延迟/历史峰值，分级着色）+ `LATENCY HISTORY` 采样趋势曲线（最多 160 个点），与慢日志互补，快速定位命令/IO/fork 毛刺
 - **Pub/Sub** — 任意频道订阅，消息流实时滚动，支持模式订阅（psubscribe）
 - **频道洞察** — `PUBSUB CHANNELS + NUMSUB` 活跃频道列表带订阅者计数，点击频道一键订阅或设为发布目标；Redis 7+ 分片频道（SHARDCHANNELS）同步展示
+- **键空间事件流** — `notify-keyspace-events` 标志位可视化配置（K/E/g/$/l/s/h/z/x/e/t/d/n/m 勾选 + 关闭/KEA/Ex 预设，CONFIG SET 保存），一键订阅 `__keyevent@db__:*`，事件流按类型着色（过期/淘汰红色、rename 紫色…），支持按键过滤、事件类型过滤与暂停
 
 ### 🛠️ 服务器管理
 
 - **复制拓扑** — `INFO replication` 可视化：master 视角看下游副本列表（地址/状态/延迟秒数/落后字节数/偏移），副本视角看上游链路（状态/上次通信时间/是否同步中），复制积压缓冲用量一目了然；延迟分级着色预警
 - **运行配置** — `CONFIG GET` 全参数搜索表（20+ 常用参数中文说明），`CONFIG SET` 图形化修改（高风险参数二次确认），一键 `CONFIG REWRITE` 持久化
 - **ACL 用户管理** — 用户列表（状态/键/命令/频道/密码数），抽屉式规则编辑：on/off、nopass、密码设置/清除、键模式、命令类别、频道模式 + 附加原始规则，最终规则实时预览；default 用户修改强确认、防误删
+- **脚本与函数** — Lua 脚本缓存面板：`SCRIPT LIST` 缓存浏览（Redis 8.2+）+ `SCRIPT LOAD` 在线加载（返回 sha1）+ `FLUSH`/`KILL`；Redis Functions 面板（Redis 7+）：函数库列表（引擎/函数数/标志位）、源码查看、`FUNCTION LOAD [REPLACE]` 注册、`FUNCTION STATS` 运行中函数监视与 `KILL`、库删除
 - **已知限制**：集群模式不支持（配置/ACL 不跨节点同步，复制拓扑请用集群视图，均可 CLI 逐节点操作）；哨兵模式作用在 master 上可用
 
 ### 📦 数据迁移
@@ -186,6 +188,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **命令面板** — `Ctrl+K` 唤起，模糊搜索连接/视图/操作，全键盘流
 - **自动更新** — 关于面板一键检查新版本；Windows 支持应用内自动安装：下载（**官方源 + 公共镜像多源竞速**，带进度、sha256 校验，镜像只能加速无法篡改；慢源/死源自动出局）→ 退出 → 弹一次 UAC 授权后提权静默安装到原目录（保留自定义安装位置）→ 自动重启新版（拒绝授权则回退启动旧版）；github.com 不可达时自动回退 API 下载通道。macOS / Linux 仍为浏览器下载（建议 brew / 包管理器）。注：自动安装面向 NSIS 安装版；绿色便携 exe 会被新安装实例替代
 - **中英双语界面** — 侧栏底部一键切换简体中文 / English，选择持久化，首次启动按系统语言自动判断；Ant Design 组件库文案同步切换（后端返回的 Redis 错误信息保持原文）
+- **连接延迟感知** — 侧栏已打开连接实时显示 PING 往返时延（5 秒刷新，<50ms 绿 / <200ms 琥珀 / 更高红色），网络抖动一眼可见
 - **精致 UI** — 无边框窗口 + 自定义标题栏、深色/浅色双主题、禁用右键菜单、禁用文本选择（终端区除外）
 
 ---

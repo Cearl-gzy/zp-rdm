@@ -19,6 +19,7 @@ export default {
     importDialogTitle: 'Import Connection Profiles',
     importSuccess: 'Imported {n} connections',
     aboutUpdate: 'About / Check for Updates',
+    rttTip: 'PING round-trip time (refreshes every 5s)',
     paletteTooltip: 'Command Palette (Ctrl+K)',
     switchLight: 'Switch to light theme',
     switchDark: 'Switch to dark theme',

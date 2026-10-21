@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -96,6 +97,19 @@ func (s *ConnectionService) CloseConnection(id string) {
 // OpenStates 已打开的连接
 func (s *ConnectionService) OpenStates() []model.ConnState {
 	return s.manager.OpenStates()
+}
+
+// PingRTT 测量 PING 往返时延（毫秒），供侧栏连接状态展示
+func (s *ConnectionService) PingRTT(connID string) (int64, error) {
+	c, err := s.manager.Get(connID, 0)
+	if err != nil {
+		return 0, err
+	}
+	start := time.Now()
+	if err := c.Ping(s.ctx).Err(); err != nil {
+		return 0, err
+	}
+	return time.Since(start).Milliseconds(), nil
 }
 
 // ExportConnections 导出连接配置

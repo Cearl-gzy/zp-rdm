@@ -261,6 +261,29 @@ type VectorImportResult struct {
 	Truncated bool     `json:"truncated"` // 错误列表被截断
 }
 
+// FunctionEntry Redis Function（Redis 7+ FUNCTION LIST 单个函数）
+type FunctionEntry struct {
+	Name  string   `json:"name"`
+	Desc  string   `json:"desc"`
+	Flags []string `json:"flags"`
+}
+
+// FunctionLibrary Redis Function 库（FUNCTION LIST 一项，Code 仅 WITHCODE 时有值）
+type FunctionLibrary struct {
+	Name      string          `json:"name"`
+	Engine    string          `json:"engine"`
+	Functions []FunctionEntry `json:"functions"`
+	Code      string          `json:"code"`
+}
+
+// FunctionRunStat FUNCTION STATS 中正在执行的函数/脚本信息（无运行时各字段为空）
+type FunctionRunStat struct {
+	Running    bool   `json:"running"`
+	Name       string `json:"name"`    // 库名/脚本 sha1
+	Command    string `json:"command"` // 触发命令（FCALL / EVALSHA ...）
+	DurationMs int64  `json:"durationMs"`
+}
+
 // ScanItems 带游标的集合元素
 type ScanItems struct {
 	Cursor uint64      `json:"cursor"`

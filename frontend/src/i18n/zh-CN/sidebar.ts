@@ -19,6 +19,7 @@ export default {
     importDialogTitle: '导入连接配置',
     importSuccess: '成功导入 {n} 个连接',
     aboutUpdate: '关于 / 检查更新',
+    rttTip: 'PING 往返时延（5 秒刷新）',
     paletteTooltip: '命令面板（Ctrl+K）',
     switchLight: '切换浅色',
     switchDark: '切换深色',
