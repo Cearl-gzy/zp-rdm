@@ -246,6 +246,21 @@ type VectorSimEntry struct {
 	Score   float64 `json:"score"` // 相似度（0~1，越大越相似）
 }
 
+// VectorLinkLayer VLINKS 单层邻居（Layer = HNSW 层级，层内按相似度降序）
+type VectorLinkLayer struct {
+	Layer     int              `json:"layer"`
+	Neighbors []VectorSimEntry `json:"neighbors"`
+}
+
+// VectorImportResult 批量向量导入结果
+type VectorImportResult struct {
+	Total     int      `json:"total"`
+	Added     int      `json:"added"`
+	Failed    int      `json:"failed"`
+	Errors    []string `json:"errors"`    // 失败原因（含行号，上限 20 条）
+	Truncated bool     `json:"truncated"` // 错误列表被截断
+}
+
 // ScanItems 带游标的集合元素
 type ScanItems struct {
 	Cursor uint64      `json:"cursor"`

@@ -231,6 +231,24 @@ export interface LatencySample {
   ms: number
 }
 
+export interface VectorSimEntry {
+  element: string
+  score: number
+}
+
+export interface VectorLinkLayer {
+  layer: number
+  neighbors: VectorSimEntry[]
+}
+
+export interface VectorImportResult {
+  total: number
+  added: number
+  failed: number
+  errors: string[]
+  truncated: boolean
+}
+
 export type InfoMap = Record<string, Record<string, string>>
 
 export interface AclUserInfo {

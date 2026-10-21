@@ -22,7 +22,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.18.0"
+const AppVersion = "1.19.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"
@@ -265,6 +265,17 @@ func (a *App) PickOpenFile(title string) (string, error) {
 	return wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
 		Title:   title,
 		Filters: []wailsRuntime.FileFilter{{DisplayName: "JSON 文件", Pattern: "*.json"}},
+	})
+}
+
+// PickDataFile 选择数据文件（向量导入等场景：JSONL / CSV）
+func (a *App) PickDataFile(title string) (string, error) {
+	return wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: title,
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "数据文件", Pattern: "*.jsonl;*.csv"},
+			{DisplayName: "所有文件", Pattern: "*.*"},
+		},
 	})
 }
 

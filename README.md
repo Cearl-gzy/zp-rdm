@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.18.0-red)
+![version](https://img.shields.io/badge/version-1.19.0-red)
 
 ---
 
@@ -125,7 +125,9 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ### 🧭 Redis 8 向量面板（Vector Set）
 
-- **VSIM 相似查询** — 按成员（`ELE`）或原始向量（`VALUES`）检索：Top-K、EF 探索因子、`FILTER` 属性过滤表达式、`TRUTH` 精确模式（线性扫描校验 HNSW 召回质量）；结果按相似度排序，着色分数条一目了然
+- **VSIM 相似查询** — 按成员（`ELE`）或原始向量（`VALUES`）检索：Top-K、EF 探索因子、`FILTER` 属性过滤表达式（语法速查 + 括号/引号配对校验）、`TRUTH` 精确模式（线性扫描校验 HNSW 召回质量）；结果按相似度排序，着色分数条一目了然，可一键导出 CSV / JSON
+- **VLINKS 邻居图** — 成员详情抽屉内可视化 HNSW 图结构：环形布局按层展示（L0 最外圈），节点越大越相似、分数着色，点击任意邻居即以其为中心重绘，直观理解向量索引的连通性
+- **批量向量导入** — JSONL（`{"element","vector":[...],"attrs"?}`，兼容 id/values/embedding 别名）与 CSV（首列元素 + 分量列，可选表头与 attrs 列）双格式，200 行管道批量写入、实时进度条、量化方式按 `VINFO` 自动适配，失败明细逐行列出
 - **成员管理** — `VADD` 增删成员（FP32 向量 JSON + `SETATTR` JSON 属性 + NOQUANT/Q8/BIN 量化选项，已有集合量化方式自动适配）、`VRANDMEMBER` 随机采样浏览（向量集合无遍历命令）
 - **向量与属性检视** — `VEMB` 查看近似向量（量化后为去量化值，一键复制）、`VGETATTR`/`VSETATTR` 在线编辑 JSON 属性
 - **概览** — `VINFO` 维度/量化类型/元素数/HNSW 参数徽标，`VCARD` 计数；Redis 8+ 连接新建键可选 vectorset 类型（低版本自动隐藏）
