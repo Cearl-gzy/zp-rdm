@@ -8,6 +8,7 @@ export default {
     welcome: 'ZP Redis CLI · 已连接 db{db} · 输入命令开始，例如 INFO server',
     candHint: '↑↓ 选择 · Tab/Enter 确认 · Esc 关闭',
     inputPlaceholder: '输入 Redis 命令…',
+    docsSince: '引入版本',
     monOn: '监听中',
     monOff: '未启动',
     filterPlaceholder: '过滤（如 GET、db0、IP）…',

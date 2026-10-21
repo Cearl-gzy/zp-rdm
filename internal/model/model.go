@@ -346,3 +346,38 @@ type CliResult struct {
 	Value  interface{} `json:"value"`
 	CostMs int64       `json:"costMs"`
 }
+
+// CommandDoc 单条命令文档（COMMAND DOCS，Redis 6.2+）
+type CommandDoc struct {
+	Name       string `json:"name"`       // 查询名，如 "set" / "config|get"
+	Summary    string `json:"summary"`    // 官方一句话说明（英文原文）
+	Since      string `json:"since"`      // 引入版本
+	Complexity string `json:"complexity"` // 时间复杂度（可能为空）
+	Syntax     string `json:"syntax"`     // redis-cli 风格用法行，如 "SET key value [NX | XX] [GET] ..."
+}
+
+// PubSubChannelInfo 活跃频道及订阅者数
+type PubSubChannelInfo struct {
+	Name string `json:"name"`
+	Subs int64  `json:"subs"`
+}
+
+// PubSubInsight 频道洞察：普通频道 + 分片频道（Redis 7+，老版本为空）
+type PubSubInsight struct {
+	Channels []PubSubChannelInfo `json:"channels"`
+	Shard    []PubSubChannelInfo `json:"shard"`
+}
+
+// LatencyEvent LATENCY LATEST 单条事件快照
+type LatencyEvent struct {
+	Name      string `json:"name"`
+	Timestamp int64  `json:"timestamp"` // 最近发生时间（Unix 秒）
+	LatestMs  int64  `json:"latestMs"`
+	MaxMs     int64  `json:"maxMs"`
+}
+
+// LatencySample LATENCY HISTORY 单条采样（时间升序）
+type LatencySample struct {
+	Timestamp int64 `json:"timestamp"` // Unix 秒
+	Ms        int64 `json:"ms"`
+}

@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.17.0-red)
+![version](https://img.shields.io/badge/version-1.18.0-red)
 
 ---
 
@@ -65,7 +65,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载、批量 TTL/移动 DB |
 | 键分析 | TOP Keys、TTL 分布、前缀内存聚合、报告导出（JSON/CSV） |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
-| 运维 | 慢日志、发布订阅、全命令 CLI（Tab 自动补全）、MONITOR 实时命令流 |
+| 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示）、MONITOR 实时命令流 |
 | 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+） |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、Redis 8 Vector Set 向量面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
@@ -111,6 +111,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 ### 🖥️ CLI 终端
 
 - **全命令支持** — 任意 Redis 命令直接执行，结果按类型着色（状态/整数/数组/错误）
+- **COMMAND DOCS 内联提示** — 输入命令名（含 CONFIG GET 这类子命令）即悬浮显示官方语法、一句话说明、引入版本与时间复杂度；文档来自服务器自身（Redis 6.2+），版本永远匹配，模块命令同样覆盖
 - **历史持久化** — 命令历史跨会话保留（上限 200 条），↑↓ 翻阅，连续重复自动去重
 - **危险命令护栏** — `FLUSHALL` / `FLUSHDB` / `SHUTDOWN` / `DEBUG` / `CONFIG SET` / `KEYS` 执行前弹确认框，防手滑
 - **MONITOR 模式** — 实时命令流监听（独立连接，不占用连接池），支持暂停、关键字过滤、500 行滚动缓冲，闪烁指示灯明确监听状态
@@ -148,7 +149,9 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 ### 🐌 慢日志 & 发布订阅
 
 - **SLOWLOG** — 慢查询列表（耗时/命令/时间/客户端），阈值说明，一键清空
+- **LATENCY 延迟事件** — `LATENCY LATEST` 事件快照表（事件/最近发生/最近延迟/历史峰值，分级着色）+ `LATENCY HISTORY` 采样趋势曲线（最多 160 个点），与慢日志互补，快速定位命令/IO/fork 毛刺
 - **Pub/Sub** — 任意频道订阅，消息流实时滚动，支持模式订阅（psubscribe）
+- **频道洞察** — `PUBSUB CHANNELS + NUMSUB` 活跃频道列表带订阅者计数，点击频道一键订阅或设为发布目标；Redis 7+ 分片频道（SHARDCHANNELS）同步展示
 
 ### 🛠️ 服务器管理
 

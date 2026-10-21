@@ -8,6 +8,7 @@ export default {
     welcome: 'ZP Redis CLI · Connected to db{db} · Type a command to start, e.g. INFO server',
     candHint: 'Up/Down to select · Tab/Enter to confirm · Esc to close',
     inputPlaceholder: 'Enter a Redis command…',
+    docsSince: 'Since',
     monOn: 'Monitoring',
     monOff: 'Not started',
     filterPlaceholder: 'Filter (e.g. GET, db0, IP)…',

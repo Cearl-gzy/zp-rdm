@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -233,13 +234,59 @@ func (s *ServerService) Publish(connID string, db int, channel, message string) 
 	return c.Publish(s.ctx, channel, message).Result()
 }
 
+// pubsubPattern go-redis 把 "*" 视为"全部频道"（省略参数），空串会被原样下发而匹配不到
+// 任何频道——统一归一化
+func pubsubPattern(pattern string) string {
+	if pattern == "" {
+		return "*"
+	}
+	return pattern
+}
+
 // PubSubChannels 当前活跃的频道
 func (s *ServerService) PubSubChannels(connID string, db int, pattern string) ([]string, error) {
 	c, err := s.cli(connID, db)
 	if err != nil {
 		return nil, err
 	}
-	return c.PubSubChannels(s.ctx, pattern).Result()
+	return c.PubSubChannels(s.ctx, pubsubPattern(pattern)).Result()
+}
+
+// PubSubInsight 频道洞察：活跃频道 + 订阅者计数（PUBSUB CHANNELS + NUMSUB），
+// 附带分片频道（SHARDCHANNELS / SHARDNUMSUB，Redis 7+；老版本忽略错误返回空）。
+func (s *ServerService) PubSubInsight(connID string, db int, pattern string) (*model.PubSubInsight, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return nil, err
+	}
+	out := &model.PubSubInsight{Channels: []model.PubSubChannelInfo{}, Shard: []model.PubSubChannelInfo{}}
+	channels, err := c.PubSubChannels(s.ctx, pubsubPattern(pattern)).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(channels) > 0 {
+		counts, err := c.PubSubNumSub(s.ctx, channels...).Result()
+		if err != nil {
+			return nil, err
+		}
+		out.Channels = attachSubCounts(channels, counts)
+	}
+	// 分片频道：Redis < 7 报 unknown subcommand，静默忽略
+	if shard, err := c.PubSubShardChannels(s.ctx, pubsubPattern(pattern)).Result(); err == nil && len(shard) > 0 {
+		counts, _ := c.PubSubShardNumSub(s.ctx, shard...).Result()
+		out.Shard = attachSubCounts(shard, counts)
+	}
+	return out, nil
+}
+
+// attachSubCounts 组装频道名 + 订阅数并按名称排序（UI 稳定展示）
+func attachSubCounts(channels []string, counts map[string]int64) []model.PubSubChannelInfo {
+	out := make([]model.PubSubChannelInfo, 0, len(channels))
+	for _, ch := range channels {
+		out = append(out, model.PubSubChannelInfo{Name: ch, Subs: counts[ch]})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // Subscribe 订阅频道（pattern=true 使用 PSUBSCRIBE），消息通过事件 pubsub:connID:db 推送

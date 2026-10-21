@@ -2,10 +2,10 @@
 import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
-import { PlusOutlined, DeleteOutlined, SendOutlined, ClearOutlined } from '@ant-design/icons-vue'
-import { Subscribe, Unsubscribe, UnsubscribeAll, Publish, PubSubChannels } from '../../wailsjs/go/service/ServerService'
+import { PlusOutlined, DeleteOutlined, SendOutlined, ClearOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { Subscribe, Unsubscribe, UnsubscribeAll, Publish, PubSubInsight } from '../../wailsjs/go/service/ServerService'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
-import type { PubSubMessage } from '../types'
+import type { PubSubMessage, PubSubInsight as Insight } from '../types'
 
 const props = defineProps<{ connId: string; db: number }>()
 
@@ -16,7 +16,8 @@ const eventName = computed(() => `pubsub:${props.connId}:${props.db}`)
 const channel = ref('')
 const isPattern = ref(false)
 const subscribed = ref<{ channel: string; pattern: boolean }[]>([])
-const activeChannels = ref<string[]>([])
+const insight = ref<Insight>({ channels: [], shard: [] })
+const insightLoading = ref(false)
 
 const pubChannel = ref('')
 const pubMessage = ref('')
@@ -57,9 +58,24 @@ async function publish() {
 }
 
 async function loadActive() {
+  insightLoading.value = true
   try {
-    activeChannels.value = ((await PubSubChannels(props.connId, props.db, '')) as unknown as string[]) || []
-  } catch { /* 忽略 */ }
+    insight.value = ((await PubSubInsight(props.connId, props.db, '')) as unknown as Insight) || { channels: [], shard: [] }
+  } catch { /* 忽略 */ } finally {
+    insightLoading.value = false
+  }
+}
+
+// 点击洞察频道直接订阅（已订阅则忽略）
+async function subscribeChannel(ch: string) {
+  if (subscribed.value.some(s => s.channel === ch)) return
+  try {
+    await Subscribe(props.connId, props.db, ch, false)
+    subscribed.value.push({ channel: ch, pattern: false })
+    message.success(t('pubsub.subscribed'))
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  }
 }
 
 onMounted(() => {
@@ -110,17 +126,46 @@ function fmtMsgTime(ms: number): string {
 
       <div class="ps-section">
         <div class="ps-title">
-          {{ t('pubsub.publishMessage') }}
-          <a-button size="small" type="link" style="margin-left: auto" @click="loadActive">{{ t('pubsub.activeChannels') }}</a-button>
+          {{ t('pubsub.insight') }}
+          <a-button size="small" type="text" style="margin-left: auto" :loading="insightLoading" @click="loadActive">
+            <template #icon><ReloadOutlined /></template>
+          </a-button>
         </div>
-        <div class="active-channels" v-if="activeChannels.length">
-          <a-tag
-            v-for="c in activeChannels"
-            :key="c"
-            class="mono active-ch"
-            @click="pubChannel = c"
-          >{{ c }}</a-tag>
+        <a-empty
+          v-if="!insight.channels.length && !insight.shard.length"
+          :description="t('pubsub.noActiveChannels')"
+          :image-style="{ height: '36px' }"
+        />
+        <div class="ch-list">
+          <div v-for="c in insight.channels" :key="c.name" class="ch-item">
+            <span class="mono ch-name" :title="c.name">{{ c.name }}</span>
+            <span class="ch-subs text-3">{{ t('pubsub.subs', { n: c.subs }) }}</span>
+            <a-tooltip :title="t('pubsub.subAction')">
+              <a-button size="small" type="text" @click="subscribeChannel(c.name)">
+                <template #icon><PlusOutlined /></template>
+              </a-button>
+            </a-tooltip>
+            <a-tooltip :title="t('pubsub.pubAction')">
+              <a-button size="small" type="text" @click="pubChannel = c.name">
+                <template #icon><SendOutlined /></template>
+              </a-button>
+            </a-tooltip>
+          </div>
         </div>
+        <template v-if="insight.shard.length">
+          <div class="shard-title text-3">{{ t('pubsub.shard') }}</div>
+          <div class="ch-list">
+            <div v-for="c in insight.shard" :key="c.name" class="ch-item">
+              <span class="mono ch-name" :title="c.name">{{ c.name }}</span>
+              <span class="ch-subs text-3">{{ t('pubsub.subs', { n: c.subs }) }}</span>
+            </div>
+          </div>
+          <div class="shard-tip text-3">{{ t('pubsub.shardTip') }}</div>
+        </template>
+      </div>
+
+      <div class="ps-section">
+        <div class="ps-title">{{ t('pubsub.publishMessage') }}</div>
         <a-input v-model:value="pubChannel" size="small" :placeholder="t('pubsub.publishChannelPlaceholder')" class="mono" style="margin-bottom: 8px" />
         <a-textarea v-model:value="pubMessage" :rows="4" :placeholder="t('pubsub.messagePlaceholder')" class="mono" />
         <a-button size="small" type="primary" block style="margin-top: 8px" @click="publish">
@@ -177,9 +222,18 @@ function fmtMsgTime(ms: number): string {
   border-radius: var(--radius-sm);
 }
 .sub-ch { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.active-channels { margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
-.active-ch { cursor: pointer; transition: border-color 0.12s, color 0.12s; }
-.active-ch:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+.ch-list { display: flex; flex-direction: column; gap: 4px; }
+.ch-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px 4px 9px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.ch-name { flex: 1; min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-subs { font-size: 10.5px; flex-shrink: 0; }
+.shard-title { font-size: 11px; font-weight: 600; margin: 10px 0 6px; }
+.shard-tip { font-size: 10.5px; margin-top: 6px; }
 .ps-right {
   flex: 1; min-width: 0;
   display: flex; flex-direction: column;

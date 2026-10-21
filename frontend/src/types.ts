@@ -201,6 +201,36 @@ export interface CliResult {
   costMs: number
 }
 
+export interface CommandDoc {
+  name: string
+  summary: string
+  since: string
+  complexity: string
+  syntax: string
+}
+
+export interface PubSubChannelInfo {
+  name: string
+  subs: number
+}
+
+export interface PubSubInsight {
+  channels: PubSubChannelInfo[]
+  shard: PubSubChannelInfo[]
+}
+
+export interface LatencyEvent {
+  name: string
+  timestamp: number
+  latestMs: number
+  maxMs: number
+}
+
+export interface LatencySample {
+  timestamp: number
+  ms: number
+}
+
 export type InfoMap = Record<string, Record<string, string>>
 
 export interface AclUserInfo {

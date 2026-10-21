@@ -5,14 +5,14 @@ import {
   ClearOutlined, EnterOutlined, PlayCircleOutlined, StopOutlined,
   PauseOutlined, CaretRightOutlined,
 } from '@ant-design/icons-vue'
-import { ExecCommand } from '../../wailsjs/go/service/CliService'
+import { ExecCommand, CommandDocs } from '../../wailsjs/go/service/CliService'
 import { SuggestKeys } from '../../wailsjs/go/service/KeyService'
 import { StartMonitor, StopMonitor } from '../../wailsjs/go/service/ServerService'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { useAppStore } from '../stores/app'
 import { REDIS_COMMANDS, REDIS_SUBCOMMANDS } from '../utils/redisCommands'
 import { useReadonly } from '../utils/readonly'
-import type { CliResult } from '../types'
+import type { CliResult, CommandDoc } from '../types'
 import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{ connId: string; db: number }>()
@@ -109,6 +109,36 @@ function applyCand(i: number) {
     inputRef.value?.focus()
   })
 }
+
+// ---------- COMMAND DOCS 内联提示 ----------
+const doc = ref<CommandDoc | null>(null)
+let docTimer: ReturnType<typeof setTimeout> | undefined
+let docSeq = 0
+
+// 文档查询名：首个 token 为命令名；若它是容器命令且已输入第二个 token，则查 "cmd|sub"
+const docKey = computed(() => {
+  const parts = input.value.trimStart().split(/\s+/).filter(Boolean)
+  if (!parts.length) return ''
+  let key = parts[0].toLowerCase()
+  if (parts.length > 1 && REDIS_SUBCOMMANDS[parts[0].toUpperCase()]) {
+    key += '|' + parts[1].toLowerCase()
+  }
+  return key
+})
+
+watch(docKey, key => {
+  clearTimeout(docTimer)
+  if (!key) { doc.value = null; return }
+  const seq = ++docSeq
+  docTimer = setTimeout(async () => {
+    try {
+      const d = (await CommandDocs(props.connId, props.db, key)) as unknown as CommandDoc | null
+      if (seq === docSeq) doc.value = d
+    } catch {
+      if (seq === docSeq) doc.value = null
+    }
+  }, 180)
+})
 
 function parseArgs(cmd: string): string[] {
   const args: string[] = []
@@ -358,6 +388,14 @@ onMounted(() => inputRef.value?.focus())
           >{{ c }}</div>
           <div class="cand-hint">{{ t('cli.candHint') }}</div>
         </div>
+        <div v-else-if="doc" class="doc-hint">
+          <div class="doc-syntax mono">{{ doc.syntax }}</div>
+          <div class="doc-summary">{{ doc.summary }}</div>
+          <div class="doc-meta">
+            <span v-if="doc.since">{{ t('cli.docsSince') }} {{ doc.since }}</span>
+            <span v-if="doc.complexity">{{ doc.complexity }}</span>
+          </div>
+        </div>
         <div class="cli-input-row">
           <a-tooltip v-if="ro" :title="t('common.readonlyTip')">
             <span class="ro-badge mono">RO</span>
@@ -488,6 +526,45 @@ onMounted(() => inputRef.value?.focus())
   color: var(--text-3);
   border-top: 1px solid var(--border);
   margin-top: 4px;
+}
+.doc-hint {
+  position: absolute;
+  bottom: 100%;
+  left: 12px;
+  right: 12px;
+  max-width: 640px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+  z-index: 19;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+}
+.doc-syntax {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1.6;
+  user-select: text;
+  word-break: break-all;
+}
+.doc-summary {
+  font-size: 11.5px;
+  color: var(--text-2);
+  line-height: 1.55;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.doc-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-3);
 }
 .cli-input-row {
   display: flex; align-items: center; gap: 12px;
