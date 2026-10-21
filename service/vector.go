@@ -265,9 +265,9 @@ func (s *ValueService) VectorSetAttr(connID string, db int, key, ele, attrs stri
 // ---------- 批量导入 ----------
 
 const (
-	vectorImportBatch     = 200        // 每批管道写入的 VADD 条数
-	vectorImportMaxErrors = 20         // 结果中保留的失败原因上限
-	vectorImportMaxSize   = 256 << 20  // 导入文件大小上限 256MB
+	vectorImportBatch     = 200       // 每批管道写入的 VADD 条数
+	vectorImportMaxErrors = 20        // 结果中保留的失败原因上限
+	vectorImportMaxSize   = 256 << 20 // 导入文件大小上限 256MB
 )
 
 // importRow 解析后的一行导入数据（line 为 1 起始行号，错误报告用）

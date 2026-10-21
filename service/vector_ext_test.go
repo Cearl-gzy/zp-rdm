@@ -73,12 +73,12 @@ func TestVectorImportJSONL(t *testing.T) {
 
 	content := strings.Join([]string{
 		`{"element":"a","vector":[1,0],"attrs":{"city":"bj"}}`,
-		`{"id":"b","values":[0.9,0.1]}`,                    // 别名 id/values
-		`{"element":"c","embedding":[0,1],"attrs":"{}"}`,   // 别名 embedding + 字符串 attrs
-		`{"element":"bad1","vector":"oops"}`,               // 坏向量
-		`{"vector":[1,1]}`,                                 // 缺 element
-		`not json`,                                         // 坏 JSON
-		`{"element":"bad2","vector":[1,0],"attrs":123}`,    // attrs 类型错
+		`{"id":"b","values":[0.9,0.1]}`,                  // 别名 id/values
+		`{"element":"c","embedding":[0,1],"attrs":"{}"}`, // 别名 embedding + 字符串 attrs
+		`{"element":"bad1","vector":"oops"}`,             // 坏向量
+		`{"vector":[1,1]}`,                               // 缺 element
+		`not json`,                                       // 坏 JSON
+		`{"element":"bad2","vector":[1,0],"attrs":123}`,  // attrs 类型错
 		``,
 	}, "\n")
 	path := filepath.Join(t.TempDir(), "in.jsonl")
