@@ -4,6 +4,7 @@ export default {
     tabConfig: '配置',
     tabAcl: 'ACL 用户',
     tabScript: '脚本',
+    tabMemory: '内存',
     // ---- 复制拓扑 ----
     repRefresh: '刷新',
     repSelf: '本节点',

@@ -5,12 +5,13 @@ import ServerConfig from './ServerConfig.vue'
 import AclPanel from './AclPanel.vue'
 import ReplicationPanel from './ReplicationPanel.vue'
 import ScriptPanel from './ScriptPanel.vue'
+import MemoryPanel from './MemoryPanel.vue'
 
-// 服务器管理面板：复制拓扑 + 运行配置（CONFIG）+ ACL 用户管理 + 脚本/函数（集群模式不展示此视图）
+// 服务器管理面板：复制拓扑 + 运行配置（CONFIG）+ ACL 用户管理 + 脚本/函数 + 内存医生（集群模式不展示此视图）
 const props = defineProps<{ connId: string; db: number }>()
 const { t } = useI18n()
 
-const tab = ref<'replication' | 'config' | 'acl' | 'script'>('replication')
+const tab = ref<'replication' | 'config' | 'acl' | 'script' | 'memory'>('replication')
 </script>
 
 <template>
@@ -27,6 +28,9 @@ const tab = ref<'replication' | 'config' | 'acl' | 'script'>('replication')
       </a-tab-pane>
       <a-tab-pane key="script" :tab="t('serverPanel.tabScript')">
         <ScriptPanel v-if="tab === 'script'" :conn-id="props.connId" :db="props.db" />
+      </a-tab-pane>
+      <a-tab-pane key="memory" :tab="t('serverPanel.tabMemory')">
+        <MemoryPanel v-if="tab === 'memory'" :conn-id="props.connId" :db="props.db" />
       </a-tab-pane>
     </a-tabs>
   </div>

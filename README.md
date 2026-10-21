@@ -5,7 +5,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.20.0-red)
+![version](https://img.shields.io/badge/version-1.21.0-red)
 
 ---
 
@@ -66,7 +66,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | 键分析 | TOP Keys、TTL 分布、前缀内存聚合、报告导出（JSON/CSV） |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
 | 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察 + 键空间事件流）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示）、MONITOR 实时命令流 |
-| 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+）、Lua 脚本缓存与 Redis Functions 管理 |
+| 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+）、Lua 脚本缓存与 Redis Functions 管理、内存医生（MEMORY STATS/DOCTOR） |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、Redis 8 Vector Set 向量面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
 | 生产安全 | 只读连接模式（客户端层拦截写命令）、环境标签着色（生产/测试/开发）、写命令审计日志 |
@@ -162,6 +162,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **运行配置** — `CONFIG GET` 全参数搜索表（20+ 常用参数中文说明），`CONFIG SET` 图形化修改（高风险参数二次确认），一键 `CONFIG REWRITE` 持久化
 - **ACL 用户管理** — 用户列表（状态/键/命令/频道/密码数），抽屉式规则编辑：on/off、nopass、密码设置/清除、键模式、命令类别、频道模式 + 附加原始规则，最终规则实时预览；default 用户修改强确认、防误删
 - **脚本与函数** — Lua 脚本缓存面板：`SCRIPT LIST` 缓存浏览（Redis 8.2+）+ `SCRIPT LOAD` 在线加载（返回 sha1）+ `FLUSH`/`KILL`；Redis Functions 面板（Redis 7+）：函数库列表（引擎/函数数/标志位）、源码查看、`FUNCTION LOAD [REPLACE]` 注册、`FUNCTION STATS` 运行中函数监视与 `KILL`、库删除
+- **内存医生** — `MEMORY STATS` 可视化：概览卡片（已用/峰值/RSS/碎片率分级着色/键数与平均每键字节）、数据集 vs 开销构成条、开销明细（启动占用/复制积压/客户端缓冲/AOF 缓冲/哈希表与过期开销/逐 DB 开销）、分配器统计（allocated/active/resident）；`MEMORY DOCTOR` 诊断结论卡片（健康/发现问题标记）；`MEMORY PURGE` 一键归还脏页；诊断报告 JSON 一键导出
 - **已知限制**：集群模式不支持（配置/ACL 不跨节点同步，复制拓扑请用集群视图，均可 CLI 逐节点操作）；哨兵模式作用在 master 上可用
 
 ### 📦 数据迁移

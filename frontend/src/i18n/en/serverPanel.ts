@@ -4,6 +4,7 @@ export default {
     tabConfig: 'Config',
     tabAcl: 'ACL Users',
     tabScript: 'Scripts',
+    tabMemory: 'Memory',
     // ---- Replication topology ----
     repRefresh: 'Refresh',
     repSelf: 'This Node',
