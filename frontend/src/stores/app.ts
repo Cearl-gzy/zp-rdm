@@ -116,6 +116,19 @@ export const useAppStore = defineStore('app', () => {
     paletteOpen.value = v ?? !paletteOpen.value
   }
 
+  // 侧栏分组折叠状态（纯 UI 状态，localStorage 持久化）
+  const COLLAPSED_KEY = 'zp-rdm-collapsed-groups'
+  const collapsedGroups = ref<Set<string>>(new Set(
+    JSON.parse(localStorage.getItem(COLLAPSED_KEY) || '[]') as string[],
+  ))
+  function toggleGroupCollapsed(name: string) {
+    const s = new Set(collapsedGroups.value)
+    if (s.has(name)) s.delete(name)
+    else s.add(name)
+    collapsedGroups.value = s
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...s]))
+  }
+
   return {
     dark, toggleTheme,
     sidebarWidth, setSidebarWidth,
@@ -124,5 +137,6 @@ export const useAppStore = defineStore('app', () => {
     paletteOpen, togglePalette,
     cliHistory, pushCliHistory,
     workspace, setOpenTabs, patchConnWorkspace,
+    collapsedGroups, toggleGroupCollapsed,
   }
 })

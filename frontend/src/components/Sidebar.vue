@@ -28,10 +28,66 @@ const { t, locale } = useI18n()
 function onLangChange(v: string) { setLocale(v as 'zh-CN' | 'en') }
 
 const keyword = ref('')
-const collapsedGroups = ref<Set<string>>(new Set())
 const formVisible = ref(false)
 const editing = ref<ConnectionProfile | null>(null)
 const auditVisible = ref(false)
+
+// ---------- 分组管理（重命名 / 移动连接） ----------
+const giVisible = ref(false)
+const giTitle = ref('')
+const giValue = ref('')
+const giSaving = ref(false)
+let giAction: ((v: string) => Promise<void>) | null = null
+
+function openGroupInput(title: string, initial: string, action: (v: string) => Promise<void>) {
+  giTitle.value = title
+  giValue.value = initial
+  giAction = action
+  giVisible.value = true
+}
+
+async function onGroupInputOk() {
+  const v = giValue.value.trim()
+  if (!v || !giAction) return
+  giSaving.value = true
+  try {
+    await giAction(v)
+    giVisible.value = false
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    giSaving.value = false
+  }
+}
+
+function openRenameGroup(name: string) {
+  openGroupInput(t('sidebar.renameGroup'), name, async v => {
+    if (v === name) return
+    await conn.renameGroup(name, v)
+    message.success(t('sidebar.groupRenamed'))
+  })
+}
+
+function openNewGroupInput(p: ConnectionProfile) {
+  openGroupInput(t('sidebar.newGroup'), '', async v => {
+    await conn.setGroup(p.id, v)
+    message.success(t('sidebar.groupMoved', { name: v }))
+  })
+}
+
+// 可移动到的目标分组（排除当前所在分组）
+function moveTargets(p: ConnectionProfile): string[] {
+  return conn.groupNames.filter(n => n !== p.group)
+}
+
+async function onMoveGroup(p: ConnectionProfile, g: string) {
+  try {
+    await conn.setGroup(p.id, g)
+    message.success(t('sidebar.groupMoved', { name: g || t('sidebar.defaultGroup') }))
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  }
+}
 
 const filteredGroups = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
@@ -47,12 +103,6 @@ const filteredGroups = computed(() => {
     }))
     .filter(g => g.items.length)
 })
-
-function toggleGroup(name: string) {
-  if (collapsedGroups.value.has(name)) collapsedGroups.value.delete(name)
-  else collapsedGroups.value.add(name)
-  collapsedGroups.value = new Set(collapsedGroups.value)
-}
 
 function openForm(p?: ConnectionProfile) {
   editing.value = p ?? null
@@ -293,11 +343,18 @@ function runAutoUpdate() {
       </div>
 
       <div v-for="g in filteredGroups" :key="g.name" class="group">
-        <div class="group-header" @click="toggleGroup(g.name)">
-          <span class="group-name">{{ g.name }}</span>
-          <span class="group-count num">{{ g.items.length }}</span>
-        </div>
-        <div v-if="!collapsedGroups.has(g.name)" class="group-items">
+        <a-dropdown :trigger="['contextmenu']">
+          <div class="group-header" @click="app.toggleGroupCollapsed(g.name)">
+            <span class="group-name">{{ g.name }}</span>
+            <span class="group-count num">{{ g.items.length }}</span>
+          </div>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item key="rename" @click="openRenameGroup(g.name)">{{ t('sidebar.renameGroup') }}</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <div v-if="!app.collapsedGroups.has(g.name)" class="group-items">
           <a-dropdown
             v-for="p in g.items"
             :key="p.id"
@@ -337,6 +394,11 @@ function runAutoUpdate() {
                     <a-menu-item key="open" @click="onOpen(p.id)">{{ t('sidebar.openConnection') }}</a-menu-item>
                     <a-menu-item key="edit" @click="openForm(p)">{{ t('common.edit') }}</a-menu-item>
                     <a-menu-item key="dup" @click="conn.duplicate(p.id).then(() => message.success(t('sidebar.duplicated')))">{{ t('common.copy') }}</a-menu-item>
+                    <a-sub-menu key="move" :title="t('sidebar.moveToGroup')">
+                      <a-menu-item v-if="p.group" key="__default" @click="onMoveGroup(p, '')">{{ t('sidebar.defaultGroup') }}</a-menu-item>
+                      <a-menu-item v-for="gn in moveTargets(p)" :key="gn" @click="onMoveGroup(p, gn)">{{ gn }}</a-menu-item>
+                      <a-menu-item key="__new" @click="openNewGroupInput(p)">{{ t('sidebar.newGroup') }}</a-menu-item>
+                    </a-sub-menu>
                     <a-menu-item v-if="conn.openIds.has(p.id)" key="close" @click="conn.close(p.id)">{{ t('sidebar.closeConnection') }}</a-menu-item>
                     <a-menu-divider />
                     <a-menu-item key="del" danger @click="onDelete(p)">{{ t('common.delete') }}</a-menu-item>
@@ -349,6 +411,11 @@ function runAutoUpdate() {
                 <a-menu-item key="open" @click="onOpen(p.id)">{{ t('sidebar.openConnection') }}</a-menu-item>
                 <a-menu-item key="edit" @click="openForm(p)">{{ t('common.edit') }}</a-menu-item>
                 <a-menu-item key="dup" @click="conn.duplicate(p.id).then(() => message.success(t('sidebar.duplicated')))">{{ t('common.copy') }}</a-menu-item>
+                <a-sub-menu key="move" :title="t('sidebar.moveToGroup')">
+                  <a-menu-item v-if="p.group" key="__default" @click="onMoveGroup(p, '')">{{ t('sidebar.defaultGroup') }}</a-menu-item>
+                  <a-menu-item v-for="gn in moveTargets(p)" :key="gn" @click="onMoveGroup(p, gn)">{{ gn }}</a-menu-item>
+                  <a-menu-item key="__new" @click="openNewGroupInput(p)">{{ t('sidebar.newGroup') }}</a-menu-item>
+                </a-sub-menu>
                 <a-menu-item v-if="conn.openIds.has(p.id)" key="close" @click="conn.close(p.id)">{{ t('sidebar.closeConnection') }}</a-menu-item>
                 <a-menu-divider />
                 <a-menu-item key="del" danger @click="onDelete(p)">{{ t('common.delete') }}</a-menu-item>
@@ -389,6 +456,24 @@ function runAutoUpdate() {
 
     <ConnectionForm v-model:open="formVisible" :profile="editing" />
     <AuditViewer v-model:open="auditVisible" />
+
+    <a-modal
+      v-model:open="giVisible"
+      :title="giTitle"
+      :width="360"
+      :ok-text="t('common.ok')"
+      :cancel-text="t('common.cancel')"
+      :confirm-loading="giSaving"
+      @ok="onGroupInputOk"
+    >
+      <a-input
+        v-model:value="giValue"
+        :placeholder="t('sidebar.groupNamePlaceholder')"
+        allow-clear
+        style="margin-top: 8px"
+        @keydown.enter="onGroupInputOk"
+      />
+    </a-modal>
 
     <a-modal v-model:open="aboutVisible" :title="t('sidebar.aboutTitle')" :width="380" :footer="null">
       <div class="about-body">

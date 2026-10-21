@@ -52,6 +52,16 @@ func (s *ConnectionService) SaveConnection(p model.ConnectionProfile) (model.Con
 	return p, nil
 }
 
+// SetConnectionGroup 仅更新连接的分组（不关闭已打开的连接，供分组重命名/移动使用）
+func (s *ConnectionService) SetConnectionGroup(id, group string) error {
+	p, ok := s.store.Get(id)
+	if !ok {
+		return fmt.Errorf("连接不存在")
+	}
+	p.Group = group
+	return s.store.Upsert(p)
+}
+
 // DeleteConnection 删除连接
 func (s *ConnectionService) DeleteConnection(id string) error {
 	s.manager.Close(id)

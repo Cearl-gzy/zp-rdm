@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, reactive, nextTick } from 'vue'
+import { ref, watch, reactive, nextTick, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 import { useConnectionStore } from '../stores/connection'
@@ -14,6 +14,12 @@ const saving = ref(false)
 const testing = ref(false)
 
 const COLORS = ['#e04536', '#f5a623', '#3fbf6b', '#3b82f6', '#a855f7', '#14b8a6', '#ec4899', '#8b93a3']
+
+// 已有分组名补全（自由输入 + 下拉建议）
+const groupOptions = computed(() => conn.groupNames.map(n => ({ value: n })))
+function filterGroup(input: string, option: any) {
+  return String(option.value).toLowerCase().includes(input.toLowerCase())
+}
 
 function emptyProfile(): ConnectionProfile {
   return {
@@ -97,7 +103,13 @@ async function onSave() {
               <a-input ref="nameInput" v-model:value="form.name" :placeholder="t('connection.namePlaceholder')" />
             </a-form-item>
             <a-form-item :label="t('connection.groupLabel')" class="flex-1">
-              <a-input v-model:value="form.group" :placeholder="t('connection.groupPlaceholder')" />
+              <a-auto-complete
+                v-model:value="form.group"
+                :placeholder="t('connection.groupPlaceholder')"
+                :options="groupOptions"
+                :filter-option="filterGroup"
+                allow-clear
+              />
             </a-form-item>
           </div>
           <div class="form-row">

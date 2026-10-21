@@ -4,7 +4,7 @@ import { message } from 'ant-design-vue'
 import {
   ListConnections, SaveConnection, DeleteConnection, DuplicateConnection,
   OpenConnection, CloseConnection, TestConnection, OpenStates,
-  ExportConnections, ImportConnections,
+  ExportConnections, ImportConnections, SetConnectionGroup,
 } from '../../wailsjs/go/service/ConnectionService'
 import { useAppStore } from './app'
 import type { ConnectionProfile, ConnState } from '../types'
@@ -29,6 +29,13 @@ export const useConnectionStore = defineStore('connection', () => {
       map.get(g)!.push(p)
     }
     return [...map.entries()].map(([name, items]) => ({ name, items }))
+  })
+
+  // 已使用的分组名（空分组=默认分组，不列出；供表单补全 / 移动分组菜单）
+  const groupNames = computed(() => {
+    const set = new Set<string>()
+    for (const p of profiles.value) if (p.group) set.add(p.group)
+    return [...set].sort((a, b) => a.localeCompare(b))
   })
 
   const openIds = computed(() => new Set(openTabs.value.map(t => t.id)))
@@ -127,6 +134,20 @@ export const useConnectionStore = defineStore('connection', () => {
     if (failed.length) message.warning(`连接失败，已跳过：${failed.join('、')}`)
   }
 
+  // 仅更新分组（后端不关闭已打开的连接），本地同步 profiles
+  async function setGroup(id: string, group: string) {
+    await SetConnectionGroup(id, group)
+    const p = profiles.value.find(x => x.id === id)
+    if (p) p.group = group
+  }
+
+  // 分组重命名：该组（含默认分组，即 group 为空）下所有连接改到新分组
+  async function renameGroup(oldName: string, newName: string) {
+    const targets = profiles.value.filter(p => (p.group || '默认分组') === oldName)
+    for (const p of targets) await SetConnectionGroup(p.id, newName)
+    await loadProfiles()
+  }
+
   async function exportTo(path: string) { await ExportConnections(path) }
   async function importFrom(path: string) {
     const n = await ImportConnections(path)
@@ -136,8 +157,8 @@ export const useConnectionStore = defineStore('connection', () => {
 
   return {
     profiles, openTabs, activeTab, opening, currentDb,
-    groups, openIds,
+    groups, groupNames, openIds,
     loadProfiles, save, remove, duplicate, test, open, close, setDb, restoreWorkspace,
-    exportTo, importFrom,
+    setGroup, renameGroup, exportTo, importFrom,
   }
 })
