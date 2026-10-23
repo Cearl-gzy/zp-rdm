@@ -43,7 +43,7 @@ func (s *ServerService) MemoryPurge(connID string, db int) error {
 
 // MemoryInfoSection INFO memory 段常用字段（供内存面板卡片与诊断报告）
 func (s *ServerService) MemoryInfoSection(connID string, db int) (map[string]string, error) {
-	info, err := s.GetInfo(connID, db, "memory")
+	info, err := s.GetInfo(connID, db, []string{"memory"})
 	if err != nil {
 		return nil, err
 	}

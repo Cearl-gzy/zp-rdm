@@ -43,7 +43,8 @@ func (s *ServerService) cli(connID string, db int) (redis.UniversalClient, error
 }
 
 // GetInfo 获取 INFO（按 section 分组）
-func (s *ServerService) GetInfo(connID string, db int, sections ...string) (map[string]map[string]string, error) {
+// 注意：Wails v2 绑定不支持变参（运行时分发报 reflect 错误且 Promise 悬挂），必须用切片
+func (s *ServerService) GetInfo(connID string, db int, sections []string) (map[string]map[string]string, error) {
 	c, err := s.cli(connID, db)
 	if err != nil {
 		return nil, err

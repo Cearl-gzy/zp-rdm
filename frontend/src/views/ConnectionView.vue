@@ -44,6 +44,24 @@ const savedView = app.workspace.conns[props.connId]?.view ?? 'data'
 const activeView = ref(views.value.includes(savedView) ? savedView : 'data')
 watch(activeView, v => app.patchConnWorkspace(props.connId, { view: v }))
 
+// 视图切换选项（AntDV Segmented 仅支持 options prop，不支持 a-segmented-option 子组件）
+const viewOptions = computed(() => {
+  const opts: { value: string; payload: { icon: unknown; text: string } }[] = [
+    { value: 'data', payload: { icon: DatabaseOutlined, text: t('connectionView.data') } },
+    { value: 'analysis', payload: { icon: PieChartOutlined, text: t('connectionView.analysis') } },
+  ]
+  if (isCluster.value) opts.push({ value: 'cluster', payload: { icon: ClusterOutlined, text: t('connectionView.cluster') } })
+  opts.push({ value: 'info', payload: { icon: DashboardOutlined, text: t('connectionView.monitor') } })
+  if (!isCluster.value) opts.push({ value: 'server', payload: { icon: SettingOutlined, text: t('connectionView.server') } })
+  opts.push(
+    { value: 'cli', payload: { icon: CodeOutlined, text: 'CLI' } },
+    { value: 'slowlog', payload: { icon: HistoryOutlined, text: t('connectionView.slowlog') } },
+    { value: 'pubsub', payload: { icon: NotificationOutlined, text: t('connectionView.pubsub') } },
+  )
+  if (hasSearch.value) opts.push({ value: 'search', payload: { icon: SearchOutlined, text: t('connectionView.search') } })
+  return opts
+})
+
 // 搜索面板"打开键"→ 切到数据视图（KeyBrowser 负责选中定位）
 let offOpenKey: (() => void) | null = null
 onMounted(() => {
@@ -67,34 +85,10 @@ const dbOptions = computed(() =>
   <div class="conn-view">
     <div class="view-header">
       <div class="vh-left">
-        <a-segmented v-model:value="activeView" size="small">
-          <a-segmented-option value="data">
-            <span class="seg-item"><DatabaseOutlined /> {{ t('connectionView.data') }}</span>
-          </a-segmented-option>
-          <a-segmented-option value="analysis">
-            <span class="seg-item"><PieChartOutlined /> {{ t('connectionView.analysis') }}</span>
-          </a-segmented-option>
-          <a-segmented-option v-if="isCluster" value="cluster">
-            <span class="seg-item"><ClusterOutlined /> {{ t('connectionView.cluster') }}</span>
-          </a-segmented-option>
-          <a-segmented-option value="info">
-            <span class="seg-item"><DashboardOutlined /> {{ t('connectionView.monitor') }}</span>
-          </a-segmented-option>
-          <a-segmented-option v-if="!isCluster" value="server">
-            <span class="seg-item"><SettingOutlined /> {{ t('connectionView.server') }}</span>
-          </a-segmented-option>
-          <a-segmented-option value="cli">
-            <span class="seg-item"><CodeOutlined /> CLI</span>
-          </a-segmented-option>
-          <a-segmented-option value="slowlog">
-            <span class="seg-item"><HistoryOutlined /> {{ t('connectionView.slowlog') }}</span>
-          </a-segmented-option>
-          <a-segmented-option value="pubsub">
-            <span class="seg-item"><NotificationOutlined /> {{ t('connectionView.pubsub') }}</span>
-          </a-segmented-option>
-          <a-segmented-option v-if="hasSearch" value="search">
-            <span class="seg-item"><SearchOutlined /> {{ t('connectionView.search') }}</span>
-          </a-segmented-option>
+        <a-segmented v-model:value="activeView" size="small" :options="viewOptions">
+          <template #label="{ payload }">
+            <span class="seg-item"><component :is="payload.icon" /> {{ payload.text }}</span>
+          </template>
         </a-segmented>
       </div>
       <div class="vh-right">
