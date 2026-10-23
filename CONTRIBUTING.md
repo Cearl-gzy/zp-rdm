@@ -39,7 +39,7 @@ ZP_RDM_TEST_STACK_ADDR=127.0.0.1:6380 go test ./...   # JSON/Search/TS/Bloom 模
 
 - **Wails 绑定方法不能用变参**（`...string`）：Wails v2 运行时分发会报 reflect 错误且前端 Promise 悬挂。集合参数一律用切片（曾有 P0 事故：`GetInfo`）。
 - **AntDV 组件以 `options` prop 为准**：如 `a-segmented` 不支持默认插槽子组件，静默不渲染。
-- 前端文案走 i18n，四种语言（zh-CN / zh-TW / en / ja）键必须同步补齐。
+- 前端文案走 i18n，两种语言（zh-CN / en）键必须同步补齐。
 - 后端 service 方法默认带 `connID, db` 两参数，通过 `redisx.Manager` 取连接。
 - 提交信息格式：`feat: / fix: / chore: / docs: 中文简述`（参考 git log）。
 
