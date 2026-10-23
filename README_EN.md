@@ -7,7 +7,7 @@ A lightweight, polished, full-featured Redis desktop manager.
 Built with **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**. Single-file exe, no runtime dependencies, connect on launch.
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.23.1-red)
+![version](https://img.shields.io/badge/version-1.24.0-red)
 
 ---
 
@@ -64,10 +64,10 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 | Module | Capabilities |
 |---|---|
-| Data browsing | Virtual-scrolled key tree, editors for every type, binary Hex view, lazy loading for large values, batch TTL / move-DB |
+| Data browsing | Virtual-scrolled key tree, editors for every type, binary Hex view, lazy loading for large values, batch TTL / move-DB, pattern batch delete |
 | Key analysis | TOP Keys, TTL distribution, per-prefix memory aggregation, report export (JSON/CSV) |
 | Monitoring | Real-time OPS / memory / clients / hit-rate trends, INFO overview, client management |
-| Operations | Slow log, LATENCY event curves, Pub/Sub (channel insights + keyspace event stream), full-command CLI (Tab completion + inline COMMAND DOCS), live MONITOR stream |
+| Operations | Slow log, LATENCY event curves, Pub/Sub (channel insights + keyspace event stream), full-command CLI (Tab completion + inline COMMAND DOCS + favorite commands), live MONITOR stream |
 | Server admin | Replication topology, CONFIG get/set/REWRITE, ACL user management (Redis 6+), Lua script cache & Redis Functions management, Memory Doctor (MEMORY STATS/DOCTOR) |
 | Modules | RedisJSON editor (text/tree, path-level writes), RediSearch query panel, TimeSeries panel, Bloom Filter panel, Redis 8 Vector Set panel |
 | Data migration | Export selected keys, full-DB export, cross-instance import, cross-connection copy |
@@ -105,6 +105,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **Lazy loading for large values** — Strings over 1MB preview only the first 1MB by default; load the full value on demand to keep the UI responsive
 - **TTL at a glance** — remaining TTL shown right on the key tree; keys expiring soon (< 5 minutes) are highlighted
 - **Type filter + pattern matching** — combine `user:*` pattern search with type filters; SCAN-based paged loading never blocks
+- **Pattern batch delete** — enter a match pattern from the ⋮ menu (prefilled with the current filter), live key count updates as you type, then SCAN-based batched deletion; scans each master directly in cluster mode, and read-only connections are blocked by the guardrail
 
 ### 📊 Key Analysis
 
@@ -131,6 +132,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **Full command support** — run any Redis command; results color-coded by type (status/integer/array/error)
 - **Inline COMMAND DOCS** — typing a command name (including subcommands like CONFIG GET) pops up the official syntax, a one-line description, the version introduced, and time complexity. Docs come from the server itself (Redis 6.2+), so they always match its version — module commands included
 - **Persistent history** — command history survives sessions (cap 200), browse with ↑↓, consecutive duplicates auto-deduped
+- **Favorite commands** — star the current input with one click, reopen the favorites panel in the toolbar to refill the input or remove entries; persisted across sessions (cap 100)
 - **Dangerous-command guardrails** — `FLUSHALL` / `FLUSHDB` / `SHUTDOWN` / `DEBUG` / `CONFIG SET` / `KEYS` ask for confirmation before executing
 - **MONITOR mode** — live command stream on a dedicated connection (doesn't occupy the pool), with pause, keyword filter, a 500-line scrollback buffer, and a blinking indicator showing listener state
 

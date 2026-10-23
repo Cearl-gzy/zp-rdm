@@ -7,7 +7,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.23.1-red)
+![version](https://img.shields.io/badge/version-1.24.0-red)
 
 ---
 
@@ -64,10 +64,10 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 | 模块 | 能力 |
 |---|---|
-| 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载、批量 TTL/移动 DB |
+| 数据浏览 | 键树虚拟滚动、全类型编辑器、二进制 Hex、大值懒加载、批量 TTL/移动 DB、按模式批量删除 |
 | 键分析 | TOP Keys、TTL 分布、前缀内存聚合、报告导出（JSON/CSV） |
 | 监控 | OPS / 内存 / 客户端 / 命中率实时趋势、INFO 概览、客户端管理 |
-| 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察 + 键空间事件流）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示）、MONITOR 实时命令流 |
+| 运维 | 慢日志、LATENCY 延迟事件曲线、发布订阅（频道洞察 + 键空间事件流）、全命令 CLI（Tab 补全 + COMMAND DOCS 内联提示 + 收藏命令）、MONITOR 实时命令流 |
 | 服务器管理 | 主从复制拓扑、CONFIG 运行参数查询/修改/REWRITE、ACL 用户管理（Redis 6+）、Lua 脚本缓存与 Redis Functions 管理、内存医生（MEMORY STATS/DOCTOR） |
 | 模块 | RedisJSON 编辑器（文本/树形、路径级写入）、RediSearch 查询面板、TimeSeries 时序面板、Bloom Filter 面板、Redis 8 Vector Set 向量面板 |
 | 数据迁移 | 选中键导出、整库导出、跨实例导入、跨连接复制 |
@@ -105,6 +105,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **大值懒加载** — 超过 1MB 的 String 默认只加载前 1MB 预览，一键加载全量，避免界面卡死
 - **TTL 一目了然** — 键树上直接显示剩余 TTL，临期键（< 5 分钟）高亮警示
 - **类型过滤 + 模式匹配** — `user:*` 模式搜索与类型筛选可叠加，SCAN 分页加载不阻塞
+- **按模式批量删除** — ⋮ 菜单输入匹配模式（默认带入当前过滤词），输入防抖实时统计匹配键数，确认后 SCAN 分批删除；集群逐 master 直连扫描，只读连接由护栏自动拦截
 
 ### 📊 键分析
 
@@ -131,6 +132,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **全命令支持** — 任意 Redis 命令直接执行，结果按类型着色（状态/整数/数组/错误）
 - **COMMAND DOCS 内联提示** — 输入命令名（含 CONFIG GET 这类子命令）即悬浮显示官方语法、一句话说明、引入版本与时间复杂度；文档来自服务器自身（Redis 6.2+），版本永远匹配，模块命令同样覆盖
 - **历史持久化** — 命令历史跨会话保留（上限 200 条），↑↓ 翻阅，连续重复自动去重
+- **收藏命令** — 输入行星标一键收藏/取消，工具栏收藏面板点击回填输入框、× 删除；跨会话持久化（上限 100 条）
 - **危险命令护栏** — `FLUSHALL` / `FLUSHDB` / `SHUTDOWN` / `DEBUG` / `CONFIG SET` / `KEYS` 执行前弹确认框，防手滑
 - **MONITOR 模式** — 实时命令流监听（独立连接，不占用连接池），支持暂停、关键字过滤、500 行滚动缓冲，闪烁指示灯明确监听状态
 
