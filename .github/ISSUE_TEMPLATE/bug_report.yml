@@ -1,0 +1,48 @@
+name: 🐛 Bug 报告 / Bug Report
+description: 报告一个问题 / Report a problem
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！中英文均可 / Thanks for the report — Chinese or English are both fine.
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: 应用左下角显示的版本号 / Version shown at the bottom-left of the app
+      placeholder: 1.23.1
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台 / Platform
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么 / What happened
+      description: 复现步骤 + 期望行为 vs 实际行为 / Steps to reproduce + expected vs actual behavior
+      placeholder: |
+        1. 打开连接 …
+        2. 点击 …
+        3. 期望 …，实际 …
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / Logs
+      description: 如有报错信息请粘贴（注意脱敏）/ Paste any error output (redact credentials)
+      render: text
+  - type: input
+    id: redis-version
+    attributes:
+      label: Redis 版本与部署方式 / Redis version & deployment
+      placeholder: 8.10.2 单机 / 7.2 集群 / 6.2 哨兵

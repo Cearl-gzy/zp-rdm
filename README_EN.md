@@ -78,6 +78,22 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ---
 
+## Screenshots
+
+| Welcome | Data Browsing (Hash editor) |
+|---|---|
+| ![Welcome](docs/screenshots/welcome.png) | ![Hash editor](docs/screenshots/main-hash.png) |
+| **JSON tree editing** | **Monitoring dashboard** |
+| ![JSON tree editing](docs/screenshots/json-tree.png) | ![Monitoring dashboard](docs/screenshots/monitor.png) |
+| **Key analysis** | **CLI terminal (Tab completion)** |
+| ![Key analysis](docs/screenshots/analysis.png) | ![CLI terminal](docs/screenshots/cli.png) |
+| **RediSearch queries** | **TimeSeries panel** |
+| ![RediSearch queries](docs/screenshots/search.png) | ![TimeSeries panel](docs/screenshots/ts-panel.png) |
+| **Bloom Filter panel** | **Vector Set similarity search** |
+| ![Bloom Filter panel](docs/screenshots/bloom.png) | ![Vector Set similarity search](docs/screenshots/vector-vsim.png) |
+
+---
+
 ## Feature Details
 
 ### 🌳 Data Browsing

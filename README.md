@@ -78,6 +78,22 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ---
 
+## 界面截图
+
+| 欢迎页 | 数据浏览（Hash 编辑器） |
+|---|---|
+| ![欢迎页](docs/screenshots/welcome.png) | ![Hash 编辑器](docs/screenshots/main-hash.png) |
+| **JSON 树形编辑** | **监控大盘** |
+| ![JSON 树形编辑](docs/screenshots/json-tree.png) | ![监控大盘](docs/screenshots/monitor.png) |
+| **键分析** | **CLI 终端（Tab 补全）** |
+| ![键分析](docs/screenshots/analysis.png) | ![CLI 终端](docs/screenshots/cli.png) |
+| **RediSearch 查询** | **TimeSeries 时序面板** |
+| ![RediSearch 查询](docs/screenshots/search.png) | ![TimeSeries 面板](docs/screenshots/ts-panel.png) |
+| **Bloom Filter 面板** | **Vector Set 向量查询** |
+| ![Bloom Filter 面板](docs/screenshots/bloom.png) | ![Vector Set 向量查询](docs/screenshots/vector-vsim.png) |
+
+---
+
 ## 功能详解
 
 ### 🌳 数据浏览
