@@ -132,6 +132,11 @@ func (a *App) SaveCliHistory(history []string) error {
 	return a.Settings.SaveCliHistory(history)
 }
 
+// SaveCliFavorites 保存 CLI 收藏命令
+func (a *App) SaveCliFavorites(favs []string) error {
+	return a.Settings.SaveCliFavorites(favs)
+}
+
 // SaveWorkspace 保存工作区会话（打开的标签 + 各连接视图状态）
 func (a *App) SaveWorkspace(w settings.Workspace) error {
 	return a.Settings.SaveWorkspace(w)

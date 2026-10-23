@@ -41,7 +41,8 @@ type Settings struct {
 	SidebarWidth int            `json:"sidebarWidth"`
 	Theme        string         `json:"theme"` // dark | light | ""（跟随默认深色）
 	LastDb       map[string]int `json:"lastDb"`
-	CliHistory   []string       `json:"cliHistory"` // CLI 命令历史（全局，上限 200 条）
+	CliHistory   []string       `json:"cliHistory"`   // CLI 命令历史（全局，上限 200 条）
+	CliFavorites []string       `json:"cliFavorites"` // CLI 收藏命令（全局，上限 100 条）
 	Workspace    Workspace      `json:"workspace"`
 }
 
@@ -59,6 +60,7 @@ func defaults() Settings {
 		Theme:        "",
 		LastDb:       map[string]int{},
 		CliHistory:   []string{},
+		CliFavorites: []string{},
 		Workspace:    Workspace{Open: []string{}, Conns: map[string]*ConnWorkspace{}},
 	}
 }
@@ -88,6 +90,9 @@ func NewAt(path string) (*Manager, error) {
 	if m.data.CliHistory == nil {
 		m.data.CliHistory = []string{}
 	}
+	if m.data.CliFavorites == nil {
+		m.data.CliFavorites = []string{}
+	}
 	if m.data.Workspace.Open == nil {
 		m.data.Workspace.Open = []string{}
 	}
@@ -111,6 +116,7 @@ func (m *Manager) Get() Settings {
 	}
 	s.LastDb = lastDb
 	s.CliHistory = append([]string(nil), m.data.CliHistory...)
+	s.CliFavorites = append([]string(nil), m.data.CliFavorites...)
 	ws := Workspace{
 		Open:   append([]string{}, m.data.Workspace.Open...),
 		Active: m.data.Workspace.Active,
@@ -150,6 +156,20 @@ func (m *Manager) SaveCliHistory(history []string) error {
 		history = history[len(history)-maxCliHistory:]
 	}
 	m.data.CliHistory = append([]string(nil), history...)
+	return m.saveLocked()
+}
+
+// maxCliFavorites CLI 收藏上限
+const maxCliFavorites = 100
+
+// SaveCliFavorites 保存 CLI 收藏命令（超出上限截断，保留最早收藏）
+func (m *Manager) SaveCliFavorites(favs []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(favs) > maxCliFavorites {
+		favs = favs[:maxCliFavorites]
+	}
+	m.data.CliFavorites = append([]string(nil), favs...)
 	return m.saveLocked()
 }
 

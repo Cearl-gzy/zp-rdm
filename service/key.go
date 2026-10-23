@@ -266,6 +266,95 @@ func (s *KeyService) DeleteKeys(connID string, db int, keys []string) (int64, er
 	return c.Del(s.ctx, keys...).Result()
 }
 
+// scanNodeKeys 全量遍历单节点匹配键并按批回调
+func (s *KeyService) scanNodeKeys(c redis.UniversalClient, pattern string, fn func([]string) error) error {
+	var cursor uint64
+	for {
+		keys, next, err := c.Scan(s.ctx, cursor, pattern, 500).Result()
+		if err != nil {
+			return err
+		}
+		if len(keys) > 0 {
+			if err := fn(keys); err != nil {
+				return err
+			}
+		}
+		if next == 0 {
+			return nil
+		}
+		cursor = next
+	}
+}
+
+// scanAll 遍历全部匹配键并按批回调（集群逐 master 直连扫描，与 scanCluster 同理不走槽位路由）
+func (s *KeyService) scanAll(c redis.UniversalClient, pattern string, fn func([]string) error) error {
+	cc, ok := c.(*redis.ClusterClient)
+	if !ok {
+		return s.scanNodeKeys(c, pattern, fn)
+	}
+	raw, err := cc.Do(s.ctx, "CLUSTER", "NODES").Text()
+	if err != nil {
+		return err
+	}
+	opt := cc.Options()
+	for _, n := range parseClusterNodes(raw) {
+		if n.Role != "master" {
+			continue
+		}
+		nc := redis.NewClient(&redis.Options{
+			Addr:         n.Addr,
+			Username:     opt.Username,
+			Password:     opt.Password,
+			DialTimeout:  opt.DialTimeout,
+			ReadTimeout:  opt.ReadTimeout,
+			WriteTimeout: opt.WriteTimeout,
+			TLSConfig:    opt.TLSConfig,
+			Dialer:       opt.Dialer,
+		})
+		err := s.scanNodeKeys(nc, pattern, fn)
+		_ = nc.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CountByPattern 统计模式匹配的键数（删除前预览）
+func (s *KeyService) CountByPattern(connID string, db int, pattern string) (int64, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return 0, err
+	}
+	if pattern == "" {
+		return 0, fmt.Errorf("模式不能为空")
+	}
+	var n int64
+	err = s.scanAll(c, pattern, func(keys []string) error {
+		n += int64(len(keys))
+		return nil
+	})
+	return n, err
+}
+
+// DeleteByPattern 按模式批量删除（SCAN 分批 + DeleteKeys；只读连接由 guard 层拦截 DEL）
+func (s *KeyService) DeleteByPattern(connID string, db int, pattern string) (int64, error) {
+	c, err := s.cli(connID, db)
+	if err != nil {
+		return 0, err
+	}
+	if pattern == "" {
+		return 0, fmt.Errorf("模式不能为空")
+	}
+	var n int64
+	err = s.scanAll(c, pattern, func(keys []string) error {
+		d, err := s.DeleteKeys(connID, db, keys)
+		n += d
+		return err
+	})
+	return n, err
+}
+
 // RenameKey 重命名
 func (s *KeyService) RenameKey(connID string, db int, key, newKey string) error {
 	c, err := s.cli(connID, db)

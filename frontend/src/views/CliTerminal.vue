@@ -3,7 +3,7 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   ClearOutlined, EnterOutlined, PlayCircleOutlined, StopOutlined,
-  PauseOutlined, CaretRightOutlined,
+  PauseOutlined, CaretRightOutlined, StarOutlined, StarFilled, CloseOutlined,
 } from '@ant-design/icons-vue'
 import { ExecCommand, CommandDocs } from '../../wailsjs/go/service/CliService'
 import { SuggestKeys } from '../../wailsjs/go/service/KeyService'
@@ -282,6 +282,21 @@ function resultClass(r: CliResult): string {
   return 'res-ok'
 }
 
+// ---------- 收藏命令 ----------
+const inputFavorited = computed(() => app.cliFavorites.includes(input.value.trim()))
+
+function toggleFavorite() {
+  const cmd = input.value.trim()
+  if (!cmd) { message.warning(t('cli.favEmpty')); return }
+  app.toggleCliFavorite(cmd)
+  message.success(inputFavorited.value ? t('cli.favAdded') : t('cli.favRemoved'))
+}
+
+function pickFavorite(cmd: string) {
+  input.value = cmd
+  nextTick(() => inputRef.value?.focus())
+}
+
 // ---------- MONITOR 模式 ----------
 const mode = ref<'cmd' | 'monitor'>('cmd')
 const monOn = ref(false)
@@ -354,6 +369,23 @@ onMounted(() => inputRef.value?.focus())
             <template #icon><ClearOutlined /></template>
           </a-button>
         </template>
+        <a-dropdown v-if="mode === 'cmd'" :trigger="['click']" placement="bottomRight">
+          <a-tooltip :title="t('cli.favListTooltip')">
+            <a-button size="small" type="text" @click.stop>
+              <template #icon><StarOutlined /></template>
+            </a-button>
+          </a-tooltip>
+          <template #overlay>
+            <div class="fav-panel" @click.stop>
+              <div v-if="!app.cliFavorites.length" class="fav-empty">{{ t('cli.favEmpty2') }}</div>
+              <div v-for="f in app.cliFavorites" :key="f" class="fav-item">
+                <span class="fav-cmd mono" :title="f" @click="pickFavorite(f)">{{ f }}</span>
+                <CloseOutlined class="fav-del" @click="app.removeCliFavorite(f)" />
+              </div>
+              <div v-if="app.cliFavorites.length" class="fav-hint">{{ t('cli.favHint') }}</div>
+            </div>
+          </template>
+        </a-dropdown>
         <a-button v-if="mode === 'cmd'" size="small" type="text" @click.stop="entries = []">
           <template #icon><ClearOutlined /></template>
           {{ t('cli.clear') }}
@@ -410,6 +442,15 @@ onMounted(() => inputRef.value?.focus())
             @keydown="onKeydown"
             @keyup.enter="onEnterKeyup"
           />
+          <a-tooltip :title="inputFavorited ? t('cli.favRemoveTip') : t('cli.favAddTip')">
+            <a-button
+              size="small" type="text"
+              class="fav-toggle" :class="{ on: inputFavorited }"
+              @click="toggleFavorite"
+            >
+              <template #icon><StarFilled v-if="inputFavorited" /><StarOutlined v-else /></template>
+            </a-button>
+          </a-tooltip>
           <a-button size="small" type="primary" :loading="running" @click="exec">
             <template #icon><EnterOutlined /></template>
           </a-button>
@@ -584,6 +625,38 @@ onMounted(() => inputRef.value?.focus())
   caret-color: var(--accent);
 }
 .cli-input::placeholder { color: var(--text-3); }
+.fav-toggle { color: var(--text-3); }
+.fav-toggle.on { color: var(--warning, #d9a03f); }
+
+/* 收藏面板 */
+.fav-panel {
+  min-width: 280px; max-width: 420px; max-height: 320px; overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+}
+.fav-empty { padding: 14px; font-size: 11.5px; color: var(--text-3); text-align: center; }
+.fav-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 6px 3px 10px;
+  border-radius: var(--radius-sm);
+}
+.fav-item:hover { background: var(--bg-hover); }
+.fav-cmd {
+  flex: 1; min-width: 0;
+  font-size: 12px; color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  cursor: pointer;
+}
+.fav-item:hover .fav-cmd { color: var(--text-1); }
+.fav-del { font-size: 10px; color: var(--text-3); cursor: pointer; padding: 3px; }
+.fav-del:hover { color: var(--accent); }
+.fav-hint {
+  padding: 4px 10px; font-size: 10px; color: var(--text-3);
+  border-top: 1px solid var(--border); margin-top: 4px;
+}
 
 /* MONITOR */
 .mon-filter-row {

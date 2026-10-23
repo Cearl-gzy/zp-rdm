@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
-import { GetSettings, SaveFrontendState, SaveCliHistory, SaveWorkspace, Version } from '../../wailsjs/go/main/App'
+import { GetSettings, SaveFrontendState, SaveCliHistory, SaveCliFavorites, SaveWorkspace, Version } from '../../wailsjs/go/main/App'
 
 export interface ConnWorkspace {
   view?: string
@@ -63,6 +63,7 @@ export const useAppStore = defineStore('app', () => {
       sidebarWidth.value = s.sidebarWidth || 236
       lastDb.value = (s.lastDb as Record<string, number>) ?? {}
       cliHistory.value = ((s.cliHistory as string[]) ?? []).slice(-200)
+      cliFavorites.value = ((s.cliFavorites as string[]) ?? []).slice(0, 100)
       const w = s.workspace
       if (w) {
         workspace.value = {
@@ -88,6 +89,29 @@ export const useAppStore = defineStore('app', () => {
     hTimer = setTimeout(() => {
       SaveCliHistory([...cliHistory.value]).catch(() => {})
     }, 800)
+  }
+
+  // CLI 收藏命令（全局共享，上限 100，防抖落盘）
+  const cliFavorites = ref<string[]>([])
+  let fTimer: ReturnType<typeof setTimeout> | null = null
+  function persistFavorites() {
+    if (!settingsReady.value) return
+    if (fTimer) clearTimeout(fTimer)
+    fTimer = setTimeout(() => {
+      SaveCliFavorites([...cliFavorites.value]).catch(() => {})
+    }, 600)
+  }
+  function toggleCliFavorite(cmd: string) {
+    const c = cmd.trim()
+    if (!c) return
+    const i = cliFavorites.value.indexOf(c)
+    if (i >= 0) cliFavorites.value.splice(i, 1)
+    else cliFavorites.value.push(c)
+    persistFavorites()
+  }
+  function removeCliFavorite(cmd: string) {
+    const i = cliFavorites.value.indexOf(cmd)
+    if (i >= 0) { cliFavorites.value.splice(i, 1); persistFavorites() }
   }
 
   // 工作区会话（打开的连接标签 + 各连接视图状态，防抖落盘）
@@ -136,6 +160,7 @@ export const useAppStore = defineStore('app', () => {
     version, initSettings,
     paletteOpen, togglePalette,
     cliHistory, pushCliHistory,
+    cliFavorites, toggleCliFavorite, removeCliFavorite,
     workspace, setOpenTabs, patchConnWorkspace,
     collapsedGroups, toggleGroupCollapsed,
   }

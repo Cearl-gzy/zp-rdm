@@ -137,3 +137,44 @@ func TestSuggestKeysLimit(t *testing.T) {
 		t.Fatal("应有匹配结果")
 	}
 }
+
+func TestDeleteByPattern(t *testing.T) {
+	s, seed, connID := newKeyService(t)
+
+	mustSet(t, seed, "cache:a", "1")
+	mustSet(t, seed, "cache:b", "2")
+	mustSet(t, seed, "cache:sub:c", "3")
+	mustSet(t, seed, "user:1", "4")
+
+	// 计数预览
+	n, err := s.CountByPattern(connID, 0, "cache:*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Fatalf("cache:* 应匹配 3 个键，实际 %d", n)
+	}
+
+	// 删除
+	d, err := s.DeleteByPattern(connID, 0, "cache:*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d != 3 {
+		t.Fatalf("应删除 3 个键，实际 %d", d)
+	}
+	if got := mustGet(t, seed, "user:1"); got != "4" {
+		t.Fatal("非匹配键不应受影响")
+	}
+	if n, _ := s.CountByPattern(connID, 0, "cache:*"); n != 0 {
+		t.Fatalf("删除后应无匹配，实际 %d", n)
+	}
+
+	// 空模式与无匹配
+	if _, err = s.DeleteByPattern(connID, 0, ""); err == nil {
+		t.Error("空模式应报错")
+	}
+	if d, _ = s.DeleteByPattern(connID, 0, "nomatch:*"); d != 0 {
+		t.Errorf("无匹配应删除 0 个，实际 %d", d)
+	}
+}

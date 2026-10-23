@@ -7,7 +7,7 @@ import {
   FolderOutlined, UnorderedListOutlined, PartitionOutlined, DatabaseOutlined,
   MoreOutlined, DownloadOutlined, UploadOutlined, DownOutlined,
 } from '@ant-design/icons-vue'
-import { ScanKeys, DeleteKeys, BatchSetTTL, MoveKeys } from '../../wailsjs/go/service/KeyService'
+import { ScanKeys, DeleteKeys, BatchSetTTL, MoveKeys, CountByPattern, DeleteByPattern } from '../../wailsjs/go/service/KeyService'
 import { CreateKey } from '../../wailsjs/go/service/ValueService'
 import { ExportKeys, ExportDatabase, ImportKeys } from '../../wailsjs/go/service/TransferService'
 import { PickSaveFile, PickOpenFile } from '../../wailsjs/go/main/App'
@@ -340,6 +340,52 @@ async function doMoveChecked() {
   }
 }
 
+// ---------- 按模式批量删除 ----------
+const pdVisible = ref(false)
+const pdPattern = ref('')
+const pdCount = ref(0)
+const pdCounting = ref(false)
+const pdRunning = ref(false)
+let pdTimer: ReturnType<typeof setTimeout> | null = null
+
+function openPatternDelete() {
+  pdPattern.value = pattern.value || '*'
+  pdVisible.value = true
+  countPattern()
+}
+
+function onPdPatternInput() {
+  if (pdTimer) clearTimeout(pdTimer)
+  pdTimer = setTimeout(countPattern, 400)
+}
+
+async function countPattern() {
+  if (!pdPattern.value) { pdCount.value = 0; return }
+  pdCounting.value = true
+  try {
+    pdCount.value = await CountByPattern(props.connId, props.db, pdPattern.value)
+  } catch (e: any) {
+    pdCount.value = 0
+    message.error(String(e?.message ?? e))
+  } finally {
+    pdCounting.value = false
+  }
+}
+
+async function doPatternDelete() {
+  pdRunning.value = true
+  try {
+    const n = await DeleteByPattern(props.connId, props.db, pdPattern.value)
+    message.success(t('keyBrowser.patternDeletedN', { n }))
+    pdVisible.value = false
+    refresh()
+  } catch (e: any) {
+    message.error(String(e?.message ?? e))
+  } finally {
+    pdRunning.value = false
+  }
+}
+
 // ---------- 数据导入导出 ----------
 // 勾选中过滤出真实叶子键
 function checkedLeafKeys(): string[] {
@@ -510,6 +556,10 @@ const listColumns = computed(() => [
               <a-menu-divider />
               <a-menu-item key="import" :disabled="ro" @click="doImport">
                 <UploadOutlined /> {{ t('keyBrowser.importMenu') }}
+              </a-menu-item>
+              <a-menu-divider />
+              <a-menu-item key="pattern-delete" :disabled="ro" @click="openPatternDelete">
+                <span class="danger-item"><DeleteOutlined /> {{ t('keyBrowser.patternDeleteMenu') }}</span>
               </a-menu-item>
             </a-menu>
           </template>
@@ -758,6 +808,37 @@ const listColumns = computed(() => [
         </div>
       </a-form>
     </a-modal>
+
+    <!-- 按模式批量删除 -->
+    <a-modal
+      v-model:open="pdVisible"
+      :title="t('keyBrowser.patternDeleteTitle')"
+      width="440px"
+      :ok-text="t('keyBrowser.patternDeleteOk', { n: pdCount })"
+      :ok-button-props="{ danger: true, disabled: !pdCount || pdCounting || !pdPattern }"
+      :cancel-text="t('common.cancel')"
+      :confirm-loading="pdRunning"
+      @ok="doPatternDelete"
+    >
+      <a-form layout="vertical" size="small">
+        <a-form-item :label="t('keyBrowser.patternDeleteLabel')">
+          <a-input
+            v-model:value="pdPattern"
+            :placeholder="t('keyBrowser.patternDeletePlaceholder')"
+            allow-clear
+            @input="onPdPatternInput"
+            @press-enter="countPattern"
+          />
+        </a-form-item>
+        <div class="pd-count" :class="{ danger: pdCount > 0 }">
+          <a-spin v-if="pdCounting" size="small" />
+          <template v-else>{{ t('keyBrowser.patternDeleteMatched', { n: pdCount }) }}</template>
+        </div>
+        <div class="text-3" style="font-size: 11px; line-height: 1.6; margin-top: 6px">
+          {{ t('keyBrowser.patternDeleteHint') }}
+        </div>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -857,4 +938,8 @@ const listColumns = computed(() => [
 .empty-icon { font-size: 38px; opacity: 0.3; margin-bottom: 14px; }
 .empty-title { font-size: 13px; color: var(--text-2); }
 .empty-sub { font-size: 11px; margin-top: 6px; opacity: 0.75; letter-spacing: 0.3px; }
+
+.danger-item { color: var(--accent); }
+.pd-count { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.pd-count.danger { color: var(--accent); }
 </style>
