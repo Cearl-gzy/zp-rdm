@@ -22,6 +22,7 @@ wails build   # 生产构建
 go test ./...               # 单元测试（miniredis，无需真实 Redis）
 gofmt -l .                  # 必须无输出
 cd frontend && npx vue-tsc --noEmit   # 改了 frontend/ 时
+cd frontend && npm test               # 前端单测（vitest，改了 frontend/ 时）
 ```
 
 有真实 Redis 时跑集成测试（CI 会跑）：
