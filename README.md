@@ -7,7 +7,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.25.2-red)
+![version](https://img.shields.io/badge/version-1.26.0-red)
 
 ---
 
@@ -172,7 +172,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ### 🐌 慢日志 & 发布订阅
 
-- **SLOWLOG** — 慢查询列表（耗时/命令/时间/客户端），阈值说明，一键清空
+- **SLOWLOG** — 慢查询列表（耗时/命令/时间/客户端），阈值说明，一键清空；**分析模式**按命令聚合当前样本（样本总数/平均/P95/峰值概览卡 + 次数/总耗时/平均/最近发生/耗时占比进度条，复合命令如 CONFIG GET 正确归组）
 - **LATENCY 延迟事件** — `LATENCY LATEST` 事件快照表（事件/最近发生/最近延迟/历史峰值，分级着色）+ `LATENCY HISTORY` 采样趋势曲线（最多 160 个点），与慢日志互补，快速定位命令/IO/fork 毛刺
 - **Pub/Sub** — 任意频道订阅，消息流实时滚动，支持模式订阅（psubscribe）
 - **频道洞察** — `PUBSUB CHANNELS + NUMSUB` 活跃频道列表带订阅者计数，点击频道一键订阅或设为发布目标；Redis 7+ 分片频道（SHARDCHANNELS）同步展示

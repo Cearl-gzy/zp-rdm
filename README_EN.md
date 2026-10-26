@@ -7,7 +7,7 @@ A lightweight, polished, full-featured Redis desktop manager.
 Built with **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**. Single-file exe, no runtime dependencies, connect on launch.
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.25.2-red)
+![version](https://img.shields.io/badge/version-1.26.0-red)
 
 ---
 
@@ -172,7 +172,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 
 ### 🐌 Slow Log & Pub/Sub
 
-- **SLOWLOG** — slow query list (duration/command/time/client), threshold explanation, one-click clear
+- **SLOWLOG** — slow query list (duration/command/time/client), threshold explanation, one-click clear; **analysis mode** aggregates current samples by command (samples/avg/P95/peak overview cards + count/total/avg/last-occurred/time-share progress bars, multiword commands like CONFIG GET grouped correctly)
 - **LATENCY events** — `LATENCY LATEST` snapshot table (event/last occurrence/last latency/historical peak, graded coloring) + `LATENCY HISTORY` sampling curves (up to 160 points); complements the slow log for pinpointing command/IO/fork spikes
 - **Pub/Sub** — subscribe to any channel with a live scrolling message stream; pattern subscriptions (psubscribe) supported
 - **Channel insights** — `PUBSUB CHANNELS + NUMSUB` active-channel list with subscriber counts; click a channel to subscribe or set it as the publish target; Redis 7+ shard channels (SHARDCHANNELS) shown alongside

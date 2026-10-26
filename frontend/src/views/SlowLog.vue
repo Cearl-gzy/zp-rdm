@@ -7,13 +7,14 @@ import { SlowLog, SlowLogReset, LatencyLatest, LatencyHistory } from '../../wail
 import { useReadonly } from '../utils/readonly'
 import type { SlowLogEntry, LatencyEvent, LatencySample } from '../types'
 import { formatTime } from '../utils/format'
+import { aggregate, summarize } from '../utils/slowlogAnalysis'
 import TrendChart from '../components/TrendChart.vue'
 
 const props = defineProps<{ connId: string; db: number }>()
 const { t } = useI18n()
 const ro = useReadonly(() => props.connId)
 
-const mode = ref<'slowlog' | 'latency'>('slowlog')
+const mode = ref<'slowlog' | 'latency' | 'analysis'>('slowlog')
 
 const logs = ref<SlowLogEntry[]>([])
 const loading = ref(false)
@@ -73,9 +74,13 @@ function selectLatEvent(event: string) {
   loadLatHistory(event)
 }
 
+// ---------- 分析模式：按命令聚合当前样本 ----------
+const summary = computed(() => summarize(logs.value))
+const aggRows = computed(() => aggregate(logs.value))
+
 watch(mode, v => {
   if (v === 'latency') loadLatency()
-  else load()
+  else if (!logs.value.length) load()
 })
 
 onMounted(load)
@@ -123,14 +128,24 @@ const latColumns = computed(() => [
   { title: t('slowlog.colLatest'), dataIndex: 'latestMs', key: 'latestMs', width: 110 },
   { title: t('slowlog.colMax'), dataIndex: 'maxMs', key: 'maxMs', width: 110 },
 ])
+
+const aggColumns = computed(() => [
+  { title: t('slowlog.colCmd'), dataIndex: 'cmd', key: 'cmd' },
+  { title: t('slowlog.colCount'), dataIndex: 'count', key: 'count', width: 80 },
+  { title: t('slowlog.colTotal'), dataIndex: 'totalUs', key: 'totalUs', width: 110 },
+  { title: t('slowlog.colAvg'), dataIndex: 'avgUs', key: 'avgUs', width: 110 },
+  { title: t('slowlog.colMax'), dataIndex: 'maxUs', key: 'maxUs', width: 110 },
+  { title: t('slowlog.colLast'), dataIndex: 'lastTs', key: 'lastTs', width: 170 },
+  { title: t('slowlog.colShare'), dataIndex: 'share', key: 'share', width: 160 },
+])
 </script>
 
 <template>
   <div class="slowlog">
     <div class="sl-toolbar">
       <a-segmented v-model:value="mode" size="small"
-        :options="[{ value: 'slowlog', label: t('slowlog.modeSlowlog') }, { value: 'latency', label: t('slowlog.modeLatency') }]" />
-      <template v-if="mode === 'slowlog'">
+        :options="[{ value: 'slowlog', label: t('slowlog.modeSlowlog') }, { value: 'analysis', label: t('slowlog.modeAnalysis') }, { value: 'latency', label: t('slowlog.modeLatency') }]" />
+      <template v-if="mode === 'slowlog' || mode === 'analysis'">
         <a-select v-model:value="count" size="small" style="width: 120px" @change="load">
           <a-select-option v-for="n in [32, 128, 512, 1024]" :key="n" :value="n">{{ t('slowlog.recentN', { n }) }}</a-select-option>
         </a-select>
@@ -138,11 +153,11 @@ const latColumns = computed(() => [
           <template #icon><ReloadOutlined /></template>
           {{ t('common.refresh') }}
         </a-button>
-        <a-button size="small" danger :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="reset">
+        <a-button v-if="mode === 'slowlog'" size="small" danger :disabled="ro" :title="ro ? t('common.readonlyTip') : ''" @click="reset">
           <template #icon><ClearOutlined /></template>
           SLOWLOG RESET
         </a-button>
-        <span class="text-3" style="font-size: 11px; margin-left: auto">{{ t('slowlog.thresholdTip') }}</span>
+        <span class="text-3" style="font-size: 11px; margin-left: auto">{{ mode === 'analysis' ? t('slowlog.analysisTip') : t('slowlog.thresholdTip') }}</span>
       </template>
       <template v-else>
         <a-button size="small" :loading="latLoading" @click="loadLatency">
@@ -176,6 +191,41 @@ const latColumns = computed(() => [
           </template>
         </template>
       </a-table>
+    </div>
+
+    <div v-else-if="mode === 'analysis'" class="sl-table">
+      <a-empty v-if="!logs.length && !loading" style="margin-top: 60px" />
+      <template v-else>
+        <div class="sum-cards">
+          <div class="sum-card"><div class="sum-val mono">{{ summary.total }}</div><div class="sum-label text-3">{{ t('slowlog.sumTotal') }}</div></div>
+          <div class="sum-card"><div class="sum-val mono">{{ durationText(summary.avgUs) }}</div><div class="sum-label text-3">{{ t('slowlog.sumAvg') }}</div></div>
+          <div class="sum-card"><div class="sum-val mono">{{ durationText(summary.p95Us) }}</div><div class="sum-label text-3">{{ t('slowlog.sumP95') }}</div></div>
+          <div class="sum-card"><div class="sum-val mono dur" :class="durationClass(summary.maxUs)">{{ durationText(summary.maxUs) }}</div><div class="sum-label text-3">{{ t('slowlog.sumMax') }}</div></div>
+        </div>
+        <a-table
+          :columns="aggColumns"
+          :data-source="aggRows"
+          :pagination="false"
+          size="small"
+          row-key="cmd"
+          :loading="loading"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'cmd'"><span class="mono cmd">{{ record.cmd }}</span></template>
+            <template v-else-if="column.key === 'count'"><span class="mono">{{ record.count }}</span></template>
+            <template v-else-if="column.key === 'totalUs'"><span class="mono dur" :class="durationClass(record.totalUs)">{{ durationText(record.totalUs) }}</span></template>
+            <template v-else-if="column.key === 'avgUs'"><span class="mono">{{ durationText(record.avgUs) }}</span></template>
+            <template v-else-if="column.key === 'maxUs'"><span class="mono dur" :class="durationClass(record.maxUs)">{{ durationText(record.maxUs) }}</span></template>
+            <template v-else-if="column.key === 'lastTs'"><span class="mono">{{ formatTime(record.lastTs) }}</span></template>
+            <template v-else-if="column.key === 'share'">
+              <div class="share-cell">
+                <a-progress :percent="Math.round(record.share * 100)" size="small" :show-info="false" stroke-color="#f5a623" />
+                <span class="mono text-3 share-num">{{ (record.share * 100).toFixed(1) }}%</span>
+              </div>
+            </template>
+          </template>
+        </a-table>
+      </template>
     </div>
 
     <div v-else class="sl-table">
@@ -244,6 +294,22 @@ const latColumns = computed(() => [
   font-size: 12.5px; font-weight: 600;
   margin-bottom: 8px;
 }
+.sum-cards {
+  display: flex; gap: 10px;
+  margin-bottom: 14px;
+}
+.sum-card {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.sum-val { font-size: 17px; font-weight: 700; }
+.sum-label { font-size: 11px; margin-top: 2px; }
+.share-cell { display: flex; align-items: center; gap: 8px; }
+.share-cell :deep(.ant-progress) { flex: 1; margin: 0; }
+.share-num { width: 44px; text-align: right; font-size: 11px; }
 :deep(.lat-row-active) td { background: var(--accent-soft) !important; }
 :deep(.ant-table-row) { cursor: pointer; }
 </style>
