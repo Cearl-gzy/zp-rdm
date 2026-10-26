@@ -45,12 +45,13 @@ jobs:
       - name: Generate wailsjs bindings
         run: wails generate module
 
-      - name: Frontend typecheck + unit tests
+      - name: Frontend typecheck + unit tests + i18n check
         working-directory: frontend
         run: |
           npm ci
           npx vue-tsc --noEmit
           npm test
+          node scripts/check-i18n.mts
 
   build-windows:
     needs: test

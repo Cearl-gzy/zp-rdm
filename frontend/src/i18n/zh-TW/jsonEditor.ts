@@ -1,0 +1,21 @@
+export default {
+  jsonEditor: {
+    modeText: '文字',
+    modeTree: '樹狀',
+    format: '格式化',
+    formatted: '已格式化',
+    invalidJson: '內容不是合法 JSON',
+    chars: '{n} 字元',
+    truncatedTag: '已截斷（預覽 1MB）',
+    loadFull: '載入完整值',
+    fullLoaded: '已載入完整內容',
+    saved: '已儲存',
+    savedPath: '已儲存 {path}',
+    summaryArray: '陣列 · {n} 項',
+    summaryObject: '物件 · {n} 鍵',
+    treeOverflow: '文件過大，樹狀僅顯示前 {n} 個節點',
+    invalidJsonEmpty: '內容不是合法 JSON，請切換到文字模式修正',
+    editNodeTitle: '編輯節點',
+    editNodeHint: '透過 JSON.SET 路徑級寫入，僅更新該節點，文件其餘部分與 TTL 不受影響',
+  },
+}

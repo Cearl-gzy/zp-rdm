@@ -7,7 +7,7 @@
 - [ ] `go test ./...` 通过
 - [ ] `gofmt -l .` 无输出
 - [ ] 前端 `npx vue-tsc --noEmit` 通过（改了 frontend/ 时）
-- [ ] 涉及 UI 文案时，两种语言（zh-CN/en）i18n 键已补齐
+- [ ] 涉及 UI 文案时，四种语言（zh-CN/zh-TW/en/ja）i18n 键已补齐
 - [ ] 已在真实 Redis 上手工验证核心路径
 
 ## 截图 / Screenshots

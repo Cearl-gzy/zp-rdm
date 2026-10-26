@@ -1,0 +1,21 @@
+export default {
+  audit: {
+    title: '書き込みコマンド監査ログ',
+    openTooltip: '監査ログ',
+    date: '日付',
+    noDates: '監査ログがありません（接続設定で「書き込みコマンド監査」を有効にしてください）',
+    connFilter: '接続',
+    allConns: 'すべての接続',
+    keyword: 'コマンド / 引数を検索',
+    refresh: '更新',
+    export: 'エクスポート',
+    exported: '{n} 件エクスポートしました',
+    colTime: '時刻',
+    colConn: '接続',
+    colCmd: 'コマンド',
+    colArgs: '引数',
+    total: '{n} 件のレコード',
+    empty: '当日の監査レコードがありません',
+    cappedTip: '直近 {n} 件のみ表示（全内容はエクスポートするかログファイルを直接参照してください）',
+  },
+}

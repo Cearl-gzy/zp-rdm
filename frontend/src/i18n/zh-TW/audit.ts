@@ -1,0 +1,21 @@
+export default {
+  audit: {
+    title: '寫命令稽核日誌',
+    openTooltip: '稽核日誌',
+    date: '日期',
+    noDates: '暫無稽核日誌（在連線設定中開啟「寫命令稽核」）',
+    connFilter: '連線',
+    allConns: '全部連線',
+    keyword: '搜尋命令 / 參數',
+    refresh: '重新整理',
+    export: '匯出',
+    exported: '已匯出 {n} 條',
+    colTime: '時間',
+    colConn: '連線',
+    colCmd: '命令',
+    colArgs: '參數',
+    total: '{n} 條紀錄',
+    empty: '當天無稽核紀錄',
+    cappedTip: '僅顯示最近 {n} 條（完整內容請匯出或直接檢視日誌檔案）',
+  },
+}

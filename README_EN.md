@@ -7,7 +7,7 @@ A lightweight, polished, full-featured Redis desktop manager.
 Built with **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**. Single-file exe, no runtime dependencies, connect on launch.
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.24.0-red)
+![version](https://img.shields.io/badge/version-1.25.0-red)
 
 ---
 
@@ -74,7 +74,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 | Production safety | Read-only connection mode (client-side write blocking), environment tag coloring (prod/test/dev), write-command audit log |
 | Cluster | Redis Cluster connections, aggregated all-node scanning, cluster node view, hash slot lookup |
 | Sentinel | Redis Sentinel connections, automatic failover following, multiple sentinel addresses |
-| Engineering | Encrypted passwords on all platforms, TLS/mTLS, workspace session restore, SSH tunneling, command palette, auto-update |
+| Engineering | Encrypted passwords on all platforms, TLS/mTLS, workspace session restore, SSH tunneling, command palette, auto-update, four-language UI (简中/繁中/EN/JA) |
 
 ---
 
@@ -210,7 +210,7 @@ tar -xzf zp-rdm-linux-amd64.tar.gz && ./zp-rdm
 - **Window state memory** — size, position, maximized state, sidebar width (draggable 160–480px), and dark/light theme all persist
 - **Command palette** — `Ctrl+K` to summon; fuzzy-search connections/views/actions, full keyboard flow
 - **Auto-update** — check for new versions in the About panel; Windows supports in-app automatic install: download (**official source + public mirrors racing**, with progress and sha256 verification — mirrors can only accelerate, never tamper; slow/dead sources drop out automatically) → exit → one UAC prompt for an elevated silent install to the original directory (custom install locations preserved) → automatic restart into the new version (declining UAC falls back to launching the old version); falls back to the API download channel when github.com is unreachable. macOS / Linux still download via browser (brew / package manager recommended). Note: auto-install targets the NSIS-installed build; a portable exe gets replaced by the newly installed instance
-- **Bilingual UI** — one click in the sidebar footer switches between 简体中文 / English; the choice persists and first launch follows the system language; Ant Design component texts switch in sync (Redis error messages from the server stay in their original language)
+- **Multilingual UI** — one click in the sidebar footer switches between 简体中文 / 繁體中文 / English / 日本語; the choice persists and first launch follows the system language; Ant Design component texts switch in sync (Redis error messages from the server stay in their original language)
 - **Connection latency awareness** — open connections show live PING round-trip time in the sidebar (5s refresh, <50ms green / <200ms amber / higher red), network jitter visible at a glance
 - **Connection group management** — right-click a group header to rename the whole group (open connections stay online), the connection menu's "Move to Group" offers existing groups or creating a new one, group collapse state survives restarts, and the connection form's group field auto-completes existing group names
 - **Polished UI** — frameless window with custom title bar, dark/light themes, right-click menu disabled, text selection disabled (except terminal areas)

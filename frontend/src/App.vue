@@ -3,7 +3,9 @@ import { computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { theme } from 'ant-design-vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
+import zhTW from 'ant-design-vue/es/locale/zh_TW'
 import enUS from 'ant-design-vue/es/locale/en_US'
+import jaJP from 'ant-design-vue/es/locale/ja_JP'
 import { CloseOutlined, LockOutlined } from '@ant-design/icons-vue'
 import { useAppStore } from './stores/app'
 import { useConnectionStore } from './stores/connection'
@@ -19,7 +21,8 @@ const app = useAppStore()
 const conn = useConnectionStore()
 const { t, locale } = useI18n()
 
-const antdLocale = computed(() => (locale.value === 'en' ? enUS : zhCN))
+const antdLocales: Record<string, typeof zhCN> = { 'zh-CN': zhCN, 'zh-TW': zhTW, en: enUS, ja: jaJP }
+const antdLocale = computed(() => antdLocales[locale.value] ?? zhCN)
 
 onMounted(async () => {
   await app.initSettings()

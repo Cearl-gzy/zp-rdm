@@ -1,0 +1,21 @@
+export default {
+  jsonEditor: {
+    modeText: 'テキスト',
+    modeTree: 'ツリー',
+    format: 'フォーマット',
+    formatted: 'フォーマットしました',
+    invalidJson: '内容が有効な JSON ではありません',
+    chars: '{n} 文字',
+    truncatedTag: '切り詰め済み（1MB プレビュー）',
+    loadFull: '完全な値を読み込む',
+    fullLoaded: '完全な内容を読み込みました',
+    saved: '保存しました',
+    savedPath: '{path} を保存しました',
+    summaryArray: '配列 · {n} 項目',
+    summaryObject: 'オブジェクト · {n} キー',
+    treeOverflow: 'ドキュメントが大きすぎるため、ツリーは先頭 {n} ノードのみ表示',
+    invalidJsonEmpty: '内容が有効な JSON ではありません。テキストモードで修正してください',
+    editNodeTitle: 'ノードを編集',
+    editNodeHint: 'JSON.SET でパス単位の書き込みを行い、このノードのみ更新します。ドキュメントの他の部分と TTL は影響を受けません',
+  },
+}

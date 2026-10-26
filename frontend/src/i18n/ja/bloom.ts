@@ -1,0 +1,21 @@
+export default {
+  bloom: {
+    inserted: '挿入済み要素',
+    capacity: '容量',
+    sizeBytes: 'ビットマップ使用量',
+    filters: 'サブフィルター',
+    fillTip: '充填率が高いほど誤判定率が上がり、100% に近づくとモジュールが自動拡張します（有効な場合）',
+    semanticsTip: 'ブルームフィルターの意味：「存在する可能性あり」は小確率で誤判定、「確実に存在しない」は常に正確',
+    add: '要素を追加',
+    added: '追加しました',
+    addedDup: '要素は既に存在する可能性があります（新規追加なし）',
+    itemRequired: '要素を入力してください',
+    itemPlaceholder: '要素の値',
+    checkTitle: '一括存在チェック',
+    checkPlaceholder: '1 行に 1 要素（最大 100 個）',
+    checkRequired: 'チェックする要素を入力してください',
+    check: 'チェック',
+    maybeExists: '存在する可能性あり',
+    definitelyNot: '確実に存在しない',
+  },
+}

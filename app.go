@@ -22,7 +22,7 @@ import (
 )
 
 // AppVersion 应用版本号（打包时同步 wails.json info.productVersion）
-const AppVersion = "1.24.0"
+const AppVersion = "1.25.0"
 
 // updateManifestURL 更新清单地址（发布服务器上的 JSON：{"version":"x.y.z","url":"下载地址"}）
 const updateManifestURL = "https://github.com/Cearl-gzy/zp-rdm/releases/latest/download/latest.json"

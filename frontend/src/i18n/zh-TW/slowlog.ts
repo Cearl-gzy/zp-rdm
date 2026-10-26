@@ -1,0 +1,23 @@
+export default {
+  slowlog: {
+    recentN: '最近 {n} 條',
+    thresholdTip: '閾值由 slowlog-log-slower-than 設定決定',
+    colTime: '時間',
+    colDuration: '耗時',
+    colClient: '用戶端',
+    colCmd: '命令',
+    resetTitle: '清空慢日誌',
+    resetContent: '確定執行 SLOWLOG RESET 嗎？',
+    resetOk: '清空',
+    resetDone: '已清空',
+    modeSlowlog: '慢日誌',
+    modeLatency: '延遲事件',
+    latencyTip: '由 latency-monitor-threshold-ms 觸發採樣（預設 0 = 關閉）',
+    noLatencyEvents: '暫無延遲事件（監控閾值未開啟或未發生毛刺）',
+    colEvent: '事件',
+    colLast: '最近發生',
+    colLatest: '最近延遲',
+    colMax: '歷史峰值',
+    latHistory: '{n} 次採樣',
+  },
+}

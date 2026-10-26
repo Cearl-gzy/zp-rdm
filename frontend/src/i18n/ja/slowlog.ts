@@ -1,0 +1,23 @@
+export default {
+  slowlog: {
+    recentN: '直近 {n} 件',
+    thresholdTip: 'しきい値は slowlog-log-slower-than 設定で決まります',
+    colTime: '時刻',
+    colDuration: '所要時間',
+    colClient: 'クライアント',
+    colCmd: 'コマンド',
+    resetTitle: 'スローログをクリア',
+    resetContent: 'SLOWLOG RESET を実行しますか？',
+    resetOk: 'クリア',
+    resetDone: 'クリアしました',
+    modeSlowlog: 'スローログ',
+    modeLatency: 'レイテンシイベント',
+    latencyTip: 'latency-monitor-threshold-ms によりサンプリングがトリガーされます（デフォルト 0 = オフ）',
+    noLatencyEvents: 'レイテンシイベントがありません（監視しきい値が未設定か、スパイクが未発生）',
+    colEvent: 'イベント',
+    colLast: '直近の発生',
+    colLatest: '直近のレイテンシ',
+    colMax: '過去のピーク',
+    latHistory: '{n} 回サンプリング',
+  },
+}
