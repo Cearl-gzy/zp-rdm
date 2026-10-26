@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+PackageIdentifier: Cearl-gzy.zp-rdm
+PackageVersion: 1.25.2
+InstallerType: nullsoft
+InstallModes:
+  - interactive
+  - silent
+InstallerSwitches:
+  Silent: /S
+  SilentWithProgress: /S
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    Scope: user
+    InstallerUrl: https://github.com/Cearl-gzy/zp-rdm/releases/download/v1.25.2/zp-rdm-amd64-installer.exe
+    InstallerSha256: 1f53de064d814e8ff6f06b82bcc65b65e8ccae64c6ce6e08412225d13785206d
+ManifestType: installer
+ManifestVersion: 1.10.0
