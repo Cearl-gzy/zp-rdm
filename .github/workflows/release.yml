@@ -42,8 +42,12 @@ jobs:
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
 
+      # main.go 有 //go:embed all:frontend/dist，生成绑定需编译根包 → 先放占位文件
       - name: Generate wailsjs bindings
-        run: wails generate module
+        run: |
+          mkdir -p frontend/dist
+          echo '<!doctype html>' > frontend/dist/index.html
+          wails generate module
 
       - name: Frontend typecheck + unit tests + i18n check
         working-directory: frontend
