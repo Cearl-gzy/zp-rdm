@@ -49,13 +49,13 @@ jobs:
           echo '<!doctype html>' > frontend/dist/index.html
           wails generate module
 
-      - name: Frontend typecheck + unit tests + i18n check
+      # i18n 键完整性已并入 vitest 用例（src/i18n/__tests__/parity.test.ts），随 npm test 跑
+      - name: Frontend typecheck + unit tests
         working-directory: frontend
         run: |
           npm ci
           npx vue-tsc --noEmit
           npm test
-          node scripts/check-i18n.mts
 
   build-windows:
     needs: test

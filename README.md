@@ -7,7 +7,7 @@
 基于 **Wails v2 + Vue 3 + TypeScript + Ant Design Vue**，单文件 exe，无运行时依赖，启动即连。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
-![version](https://img.shields.io/badge/version-1.25.1-red)
+![version](https://img.shields.io/badge/version-1.25.2-red)
 
 ---
 
